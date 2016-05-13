@@ -9,6 +9,8 @@
 
 [Libstock](http://libstock.mikroe.com/projects/view/1207/ble2-click)
 
+[Tutorial](http://learn.mikroe.com/bluetooth-low-energy-part-3-ble-2-click/)
+
 ---
 
 Microchip’s RN4020 Bluetooth Low Energy Module provides a highly integrated solution for delivering low power Bluetooth 4.1 solutions.
