@@ -12,7 +12,7 @@
 *
 *******************************************************************************/
 /**
- * @brief This module contains the hal layer for Mikroelektronika's RF Lora
+ * @brief This module contains the hal layer for Mikroelektronika's BLE
  *  click board.
  */
 /******************************************************************************
@@ -36,6 +36,12 @@ static void ( *write_uart_p )( unsigned int _data );
 static void ( *write_text_p )( unsigned char *_data );
 #elif defined ( __MIKROC_PRO_FOR_PIC__ )     || \
       defined ( __MIKROC_PRO_FOR_FT90x__ )
+static void ( *write_uart_p )( unsigned char _data );
+static void ( *write_text_p )( unsigned char *_data );
+#elif defined (ARDUINO_ARCH_AVR)
+#include <string.h>
+void UART_Wr_Ptr(unsigned char _data);
+void UART_Write_Text(unsigned char *_data);
 static void ( *write_uart_p )( unsigned char _data );
 static void ( *write_text_p )( unsigned char *_data );
 #endif

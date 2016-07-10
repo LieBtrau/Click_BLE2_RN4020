@@ -74,15 +74,23 @@ typedef enum
 
 typedef enum
 {
+    PWR_MIN19_1dBm,
+    PWR_MIN15_1dBm,
+    PWR_MIN10_9dBm,
+    PWR_MIN6_9dBm,
+    PWR_MIN2_5dBm,
+    PWR_1_6dBm,
+    PWR_5_8dBm,
+    PWR_7_5
+}tx_pwr_t;
+
+typedef enum
+{
     RESET_SOME = 1,
     RESET_ALL
 }reset_parameter_t;
 
-typedef enum
-{
-    AA = 0,
-    AB = 1,
-}transmission_power_t;
+
 typedef enum
 {
     NOT_SAVED  = 0,
@@ -111,8 +119,8 @@ typedef enum
 typedef enum
 {
     PW_ON = 0,
-    TIMER1,
-    TIMER2,
+    TIMER1_t,
+    TIMER2_t,
     CONN,
     DISCON,
     PIOL,
@@ -154,6 +162,8 @@ void ble2_set_device_bluetooth_name (char* device_name);
  * 0 if succesful, -1 if invalid baud rate passed
  */
 int8_t ble2_set_baud_rate (baud_rate_t baud_rate);
+
+int8_t ble2_set_transmission_power(tx_pwr_t pwr);
 /**
  * @brief
  * Sets the value of the firmware revision characteristic in the Device Information Service.
@@ -322,7 +332,7 @@ void ble2_query_peripheral_devices(uint16_t scan_interval, uint16_t scan_window)
  * @return
  * 0 if succesful, -1 if failed
  */
-int8_t ble2_receive_broadcast_messages(uint16_t scan_interval, uint16_t scan_window);
+void ble2_receive_broadcast_messages(uint16_t scan_interval, uint16_t scan_window);
 /**
  * @brief
  * Places the device into or out of an observer role.
@@ -389,7 +399,7 @@ void ble2_device_reboot();
  * @param timeout
  * Desired connection timeout
  */
-void ble2_change_connection_parameters(uint16_t interval, uint16_t latency, uint16_t timeout);
+uint8_t ble2_change_connection_parameters(uint16_t interval, uint16_t latency, uint16_t timeout);
 /**
  * @brief
  * Removes the existing bonding, it also changes the advertisement method.
@@ -548,7 +558,7 @@ void ble2_write_server_characteristic_value_via_UUID (char* UUID, char* content)
  * that the private characteristic holds. The real data size can be smaller. The maximum
  * data size of a characteristic cannot exceed 20 bytes.
  */
-void ble2_set_private_characteristics(char* UUID, char* bitmap_characteristic, char* max_data_len);
+uint8_t ble2_set_private_characteristics(char* UUID, char* bitmap_characteristic, uint8_t max_data_len);
 /**
  * @brief
  * Sets the primary UUID filter of the private service.
