@@ -1,8 +1,8 @@
 #include "rn4020.h"
 #include "ble2_hw.h"
 
-static SoftwareSerial* sPort;
-static HardwareSerial* sPortDebug;
+static HardwareSerial* sPort;
+static SoftwareSerial* sPortDebug;
 extern SoftwareSerial sw;
 
 #ifdef __cplusplus
@@ -28,111 +28,82 @@ void UART_Write_Text(unsigned char *_data)
 } // extern "C"
 #endif
 
-rn4020::rn4020(SoftwareSerial &s, byte pinCts, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive):
-    _pinCts(pinCts),
-    _pinWake_sw(pinWake_sw),
-    _pinWake_hw(pinWake_hw),
+rn4020::rn4020(HardwareSerial &s, byte pinCts, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive):
+    _pinCts_14(pinCts),
+    _pinWake_sw_7(pinWake_sw),
+    _pinWake_hw_15(pinWake_hw),
     _pinEnPwr(pinEnPwr),
-    _pinActive(pinBtActive)
+    _pinActive_12(pinBtActive)
 {
     sPort=&s;
-    sPortDebug=&Serial;
+    sPortDebug=&sw;
     ble2_hal_init();
+}
+
+bool rn4020::reset(unsigned long baudrate)
+{
+#if DEBUG_LEVEL >= DEBUG_ALL
+    sPortDebug->print("Bytes available: ");
+    sPortDebug->println(sPort->available());
+#endif
+    ble2_device_reboot();
+    //ProTrinket 3V gets framing errors when trying to receive the "Reboot".
+//    if(!waitForReply(2000,"Reboot"))
+//    {
+//#if DEBUG_LEVEL >= DEBUG_ALL
+//        sPortDebug->println("Module doesn't reboot");
+//#endif
+//        return false;
+//    }
+    return waitForStartup(baudrate);
 }
 
 bool rn4020::begin(unsigned long baudrate)
 {
     pinMode(_pinEnPwr, OUTPUT);
+    pinMode(_pinWake_hw_15, OUTPUT);
+    pinMode(_pinWake_sw_7, OUTPUT);
+    pinMode(_pinCts_14, OUTPUT);
+    pinMode(_pinActive_12, INPUT);
+
+    digitalWrite(_pinCts_14,LOW);
+    digitalWrite(_pinWake_hw_15, LOW);
+    digitalWrite(_pinWake_sw_7, LOW);
     digitalWrite(_pinEnPwr, HIGH);//module OFF
-    pinMode(_pinWake_hw, OUTPUT);
-    digitalWrite(_pinWake_hw, LOW);
-    pinMode(_pinWake_sw, OUTPUT);
-    pinMode(_pinCts, OUTPUT);
-    digitalWrite(_pinCts,LOW);
-    pinMode(_pinActive, INPUT);
     delay(100);
     digitalWrite(_pinEnPwr, LOW);//module ON
-    digitalWrite(_pinWake_sw, HIGH);
-    sPort->begin(baudrate);
-    if(!isModuleActive(1500))
-    {
-        return false;
-    }
-    //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART
-    if(!waitForReply(1000,"CMD"))
-    {
-        return false;
-    }
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->println("RN4020 Module found");
-#endif
-    return true;
+    digitalWrite(_pinWake_sw_7, HIGH);
+    return waitForStartup(baudrate);
 }
 
-void rn4020::getResponse(unsigned int uiTimeout, char* readData, byte buflength)
-{
-    byte index=0;
-    if(!readData)
-    {
-        return;
-    }
-    readData[0]='\0';
-    unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+uiTimeout && index<buflength)
-    {
-        if(sPort->available())
-        {
-            char c=sPort->read();
-            readData[index++]=c;
-        }
-    }
-#if DEBUG_LEVEL >= DEBUG_ALL
-    if(!index)
-    {
-        sPortDebug->println("Nothing received");
-        return;
-    }
-    sPortDebug->print("RX: ");
-    //Print data in plain text format
-    for(byte i=0;i<index;i++)
-    {
-        sPortDebug->print(readData[i]>27 ? readData[i]: '.');
-    }
-    sPortDebug->print("\t\t");
-    //Print data in HEX format
-    for(byte i=0;i<index;i++)
-    {
-        sPortDebug->print((byte)readData[i],HEX);
-        sPortDebug->print(" ");
-    }
-    sPortDebug->println();
-#endif
-}
-
-bool rn4020::waitForReply(unsigned int uiTimeout, const char* pattern)
-{
-    char readData[100]={0};
-    getResponse(uiTimeout, readData,100);
-    return (strncmp(readData, pattern, strlen(pattern))==0);
-}
 
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
  * power.  Take this into account when designing a PCB with this module.  You should be able to toggle the power
  * of the RN4020 with a GPIO of your MCU.
  * At power up, the SW_WAKE pin is held high to force full factory reset when toggling the HW_WAKE lines.
- * By watching the UART, this function verifies that the module has reset correctly.
  */
 bool rn4020::doFactoryDefault()
 {
-
-    //    //Factory reset the module
-    //    for(byte i=0;i<3;i++)
-    //    {
-    //	digitalWrite(_pinWake_hw, HIGH);
-    //	delay(200);
-    //	digitalWrite(_pinWake_hw, LOW);
-    //	delay(200);
-    //    }
+    digitalWrite(_pinWake_sw_7, HIGH);
+    if(!isModuleActive(2000))
+    {
+        return false;
+    }
+    delay(200);
+#if DEBUG_LEVEL >= DEBUG_ALL
+    sPortDebug->println("Forcing factory default.");
+#endif
+    for(byte i=0;i<8;i++)
+    {
+        digitalWrite(_pinWake_hw_15, HIGH);
+        delay(200);
+        digitalWrite(_pinWake_hw_15, LOW);
+        delay(200);
+    }
+    //Give module time to reset.
+    //It won't send any data to signal a succeeded factory reset.  Pin 12 will remain high
+    delay(1500);
+    return true;
 }
 
 bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
@@ -174,21 +145,19 @@ bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
             ble2_set_baud_rate(BR_921600);
             break;
         default:
-#if DEBUG_LEVEL >= DEBUG_ALL
-            sPortDebug->println("Unknown baud rate");
-#endif
+            //#if DEBUG_LEVEL >= DEBUG_ALL
+            //            sPortDebug->println("Unknown baud rate");
+            //#endif
+            return false;
         }
         if(!waitForReply(2000,"AOK"))
         {
+#if DEBUG_LEVEL >= DEBUG_ALL
+            sPortDebug->println("Baudrate change not accepted");
+#endif
             return false;
         }
-        ble2_device_reboot();
-        sPort->begin(ulValue);
-        if(!waitForReply(1000,"Reboot"))
-        {
-            return false;
-        }
-        return waitForReply(2000,"CMD");
+        return true;
     default:
 #if DEBUG_LEVEL >= DEBUG_ALL
         sPortDebug->println("Undefined set command");
@@ -197,10 +166,37 @@ bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
     }
 }
 
-bool rn4020::isModuleActive(unsigned int uiTimeout)
+bool rn4020::waitForStartup(unsigned long baudrate)
+{
+    sPort->begin(baudrate);
+    //After power up, it takes about 1.28s for the RN4020 to become active
+    if(!isModuleActive(1500))
+    {
+        return false;
+    }
+    //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART
+    if(!waitForReply(2000,"CMD"))
+    {
+        return false;
+    }
+#if DEBUG_LEVEL >= DEBUG_ALL
+    sPortDebug->println("RN4020 Module found");
+#endif
+    return true;
+}
+
+bool rn4020::isModuleActive(unsigned long uiTimeout)
 {
     unsigned long ulStartTime=millis();
-    while(!digitalRead(_pinActive))
+    if(!digitalRead(_pinActive_12))
+    {
+        //Clean serial port buffer
+        while(sPort->available())
+        {
+            sPort->read();
+        }
+    }
+    while(!digitalRead(_pinActive_12))
     {
         //Typically pin12 comes high 1.28s after powerup.
         if(millis()>ulStartTime+uiTimeout)
@@ -212,4 +208,65 @@ bool rn4020::isModuleActive(unsigned int uiTimeout)
         }
     }
     return true;
+}
+
+bool rn4020::waitForReply(unsigned long uiTimeout, const char* pattern)
+{
+    char readLine[10]={0};
+    getLine(uiTimeout, readLine, 10);
+    int result=strspn(readLine, pattern);
+//#if DEBUG_LEVEL >= DEBUG_ALL
+//    sPortDebug->println(result, DEC);
+//#endif
+    return result == strlen(pattern);
+}
+
+void rn4020::getLine(unsigned long uiTimeout, char* buf, byte buflength)
+{
+    byte index=0;
+    char b=0,c=0;
+    if(!buf)
+    {
+        return;
+    }
+    buf[0]='\0';
+    unsigned long ulStartTime=millis();
+    while(millis()<ulStartTime+uiTimeout && index<buflength)
+    {
+        if(sPort->available())
+        {
+            b=c;
+            c=sPort->read();
+            if((((byte)c)!=0xFF) && (((byte)c)!=0x00))
+            {
+                buf[index++]=c;
+            }
+            if(b=='\r' && c=='\n')
+            {
+                break;
+            }
+        }
+    }
+    buf[index]='\0';
+#if DEBUG_LEVEL >= DEBUG_ALL
+    if(!index)
+    {
+        sPortDebug->println("Nothing received");
+        return;
+    }
+    sPortDebug->print("RX: ");
+    //Print data in plain text format
+    for(byte i=0;i<index;i++)
+    {
+        sPortDebug->print(buf[i]>27 ? buf[i]: '.');
+    }
+    sPortDebug->print("\t\t");
+    //Print data in HEX format
+    for(byte i=0;i<index;i++)
+    {
+        sPortDebug->print((byte)buf[i],HEX);
+        sPortDebug->print(" ");
+    }
+    sPortDebug->println();
+#endif
 }
