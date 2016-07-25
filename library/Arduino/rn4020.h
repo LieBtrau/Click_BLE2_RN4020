@@ -16,7 +16,7 @@ public:
     bool begin(unsigned long baudrate);
     bool set(SETGET st, unsigned long ulValue);
     bool doFactoryDefault();
-    bool reset(unsigned long baudrate);
+    bool doReboot(unsigned long baudrate);
 private:
     void getLine(unsigned long uiTimeout, char *buf, byte buflength);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);

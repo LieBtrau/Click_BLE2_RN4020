@@ -40,24 +40,6 @@ rn4020::rn4020(HardwareSerial &s, byte pinCts, byte pinWake_sw, byte pinWake_hw,
     ble2_hal_init();
 }
 
-bool rn4020::reset(unsigned long baudrate)
-{
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->print("Bytes available: ");
-    sPortDebug->println(sPort->available());
-#endif
-    ble2_device_reboot();
-    //ProTrinket 3V gets framing errors when trying to receive the "Reboot".
-//    if(!waitForReply(2000,"Reboot"))
-//    {
-//#if DEBUG_LEVEL >= DEBUG_ALL
-//        sPortDebug->println("Module doesn't reboot");
-//#endif
-//        return false;
-//    }
-    return waitForStartup(baudrate);
-}
-
 bool rn4020::begin(unsigned long baudrate)
 {
     pinMode(_pinEnPwr, OUTPUT);
@@ -75,7 +57,6 @@ bool rn4020::begin(unsigned long baudrate)
     digitalWrite(_pinWake_sw_7, HIGH);
     return waitForStartup(baudrate);
 }
-
 
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
  * power.  Take this into account when designing a PCB with this module.  You should be able to toggle the power
@@ -105,6 +86,19 @@ bool rn4020::doFactoryDefault()
     delay(1500);
     return true;
 }
+
+bool rn4020::doReboot(unsigned long baudrate)
+{
+    pinMode(A0, OUTPUT);
+    digitalWrite(A0, HIGH);
+    delay(1);
+    digitalWrite(A0, LOW);
+    ble2_device_reboot();
+    //ProTrinket 3V gets framing errors when trying to receive the "Reboot".
+    //waitForReply(2000,"Reboot");
+    return waitForStartup(baudrate);
+}
+
 
 bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
 {
@@ -168,6 +162,7 @@ bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
 
 bool rn4020::waitForStartup(unsigned long baudrate)
 {
+    sPort->end();
     sPort->begin(baudrate);
     //After power up, it takes about 1.28s for the RN4020 to become active
     if(!isModuleActive(1500))
