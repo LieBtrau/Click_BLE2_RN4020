@@ -558,7 +558,7 @@ void ble2_write_server_characteristic_value_via_UUID (char* UUID, char* content)
  * that the private characteristic holds. The real data size can be smaller. The maximum
  * data size of a characteristic cannot exceed 20 bytes.
  */
-uint8_t ble2_set_private_characteristics(char* UUID, char* bitmap_characteristic, uint8_t max_data_len);
+uint8_t ble2_set_private_characteristics(const char* UUID, const char* bitmap_characteristic, uint8_t max_data_len);
 /**
  * @brief
  * Sets the primary UUID filter of the private service.
@@ -577,7 +577,7 @@ void ble2_erase_private_service_primary_filter_uuid();
  * @param uuid
  * 128-bit UUID for the private service.
  */
-void ble2_set_private_service_uuid(char* uuid);
+void ble2_set_private_service_uuid(const char* uuid);
 /**
  * @brief
  * Clears all settings of the private service and the private characteristics.

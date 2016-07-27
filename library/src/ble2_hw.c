@@ -188,7 +188,7 @@ int8_t ble2_reset_to_factory_default(reset_parameter_t reset)
 
     if(reset != RESET_SOME && reset!=RESET_ALL)
     {
-    return -1;
+        return -1;
     }
     strcpy( tmp, "SF,");
     strcat( tmp, RESET_SOME ? "1" : "2");
@@ -239,11 +239,11 @@ int8_t ble2_set_initial_connection_params (uint16_t interval, uint16_t latency, 
     char tmp2[10];
 
     if ( (interval < 0x0006) || (interval > 0x0C80) )
-    return -1;
+        return -1;
     if ( (latency > 0x01F3) || (latency < (timeout * 10/(interval * 1.25 - 1))) )
-    return -1;
+        return -1;
     if ( ( timeout < 0x000A ) || ( timeout > 0x0C80 ) )
-    return -1;
+        return -1;
 
     strcpy(tmp, "ST,");
     sprintf(tmp2,"%04X",interval);
@@ -273,9 +273,11 @@ void ble2_start_advertisment (uint16_t interval, uint16_t window_time)
     strcpy (tmp,"A,");
     sprintf(tmp2,"%04X",interval);
     strcat(tmp,tmp2);
-    sprintf(tmp2,"%04X",interval);
-    strcat(tmp,tmp2);
-
+    if(window_time>interval)
+    {
+        sprintf(tmp2,",%04X",interval);
+        strcat(tmp,tmp2);
+    }
     ble2_hal_send(tmp);
 }
 
@@ -298,9 +300,9 @@ int8_t ble2_start_connection(mac_address_t mac_address_type, char* mac_address )
     char tmp[20] = {0};
 
     if (mac_address_type > 1)
-    return -1;
+        return -1;
     if (strlen (mac_address) > 6)
-    return -1;
+        return -1;
 
     strcpy(tmp, "E,");
     strcat(tmp, (!mac_address_type) ? "0" : "1");
@@ -378,7 +380,7 @@ void ble2_get_bonded_status()
 
 void ble2_device_reboot()
 {
-     ble2_hal_send("R,1");
+    ble2_hal_send("R,1");
 }
 
 uint8_t ble2_change_connection_parameters(uint16_t interval, uint16_t latency, uint16_t timeout)
@@ -387,11 +389,11 @@ uint8_t ble2_change_connection_parameters(uint16_t interval, uint16_t latency, u
     char tmp2[10];
 
     if ( (interval < 0x0006) || (interval > 0x0C80) )
-    return -1;
+        return -1;
     if ( (latency > 0x01F3) || (latency < (timeout * 10/(interval * 1.25 - 1))) )
-    return -1;
+        return -1;
     if ( ( timeout < 0x000A ) || ( timeout > 0x0C80 ) )
-    return -1;
+        return -1;
 
     strcpy(tmp, "T,");
     sprintf(tmp2,"%04X",interval);
@@ -579,21 +581,22 @@ void ble2_write_server_characteristic_value_via_UUID (char* UUID, char* content)
     ble2_hal_send(tmp);
 }
 
-uint8_t ble2_set_private_characteristics(char* UUID, char* bitmap_characteristic, uint8_t max_data_len)
+uint8_t ble2_set_private_characteristics(const char* UUID, const char* bitmap_characteristic, uint8_t max_data_len)
 {
-     char tmp[100] = {0};
-     char tmp2[10];
+    char tmp[100] = {0};
+    char tmp2[10];
 
-     if (max_data_len > 20)
+    if (max_data_len > 20)
         return -1;
 
-     strcpy(tmp, "PC");
-     strcat(tmp, UUID);
-     strcat(tmp,bitmap_characteristic);
-     sprintf(tmp2,"%02X",max_data_len);
-     strcat(tmp,tmp2);
-     ble2_hal_send(tmp);
-     return 0;
+    strcpy(tmp, "PC,");
+    strcat(tmp, UUID);
+    strcat(tmp,",");
+    strcat(tmp,bitmap_characteristic);
+    sprintf(tmp2,",%02X",max_data_len);
+    strcat(tmp,tmp2);
+    ble2_hal_send(tmp);
+    return 0;
 }
 
 void ble2_set_private_service_primary_filter_uuid(char* UUID)
@@ -610,7 +613,7 @@ void ble2_erase_private_service_primary_filter_uuid()
     ble2_hal_send("PF,Z");
 }
 
-void ble2_set_private_service_uuid(char* uuid)
+void ble2_set_private_service_uuid(const char* uuid)
 {
     char tmp[35] = {0};
 

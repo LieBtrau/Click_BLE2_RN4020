@@ -107,10 +107,10 @@ bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
     {
     case SRV_SERVICES:
         ble2_set_server_services(ulValue);
-        return waitForReply(2000,"AOK");
+        break;
     case SUP_FEATURES:
         ble2_set_supported_features(ulValue);
-        return waitForReply(2000,"AOK");
+        break;
     case BAUDRATE:
         switch(ulValue)
         {
@@ -144,21 +144,71 @@ bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
             //#endif
             return false;
         }
-        if(!waitForReply(2000,"AOK"))
+        break;
+    case TX_POWER:
+        if(ulValue>7)
         {
-#if DEBUG_LEVEL >= DEBUG_ALL
-            sPortDebug->println("Baudrate change not accepted");
-#endif
             return false;
         }
-        return true;
+        ble2_set_transmission_power((tx_pwr_t)ulValue);
+        break;
     default:
 #if DEBUG_LEVEL >= DEBUG_ALL
         sPortDebug->println("Undefined set command");
 #endif
         return false;
     }
+    if(!waitForReply(2000,"AOK"))
+    {
+#if DEBUG_LEVEL >= DEBUG_ALL
+        sPortDebug->println("No response for set");
+ #endif
+        return false;
+    }
+    return true;
 }
+
+bool rn4020::createService(rn4020::SERVICES srv)
+{
+    //Create service
+    switch(srv)
+    {
+    case IAS:
+        ble2_set_private_service_uuid("1802");
+        break;
+    default:
+        return false;
+    }
+    if(!waitForReply(2000,"AOK"))
+    {
+        return false;
+    }
+    //Set characteristics of the created service
+    switch(srv)
+    {
+    case IAS:
+        ble2_set_private_characteristics("1802","04",1);//"write without response", 1 byte maximum
+        break;
+    default:
+        return false;
+    }
+    return waitForReply(2000,"AOK");
+}
+
+bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
+{
+    if(bStartNotStop)
+    {
+        //Start
+        ble2_start_advertisment(interval_ms,0);
+    }else
+    {
+        //Stop
+        ble2_stop_advertising();
+    }
+    return waitForReply(2000,"AOK");
+}
+
 
 bool rn4020::waitForStartup(unsigned long baudrate)
 {
@@ -208,12 +258,16 @@ bool rn4020::isModuleActive(unsigned long uiTimeout)
 bool rn4020::waitForReply(unsigned long uiTimeout, const char* pattern)
 {
     char readLine[10]={0};
-    getLine(uiTimeout, readLine, 10);
-    int result=strspn(readLine, pattern);
-//#if DEBUG_LEVEL >= DEBUG_ALL
-//    sPortDebug->println(result, DEC);
-//#endif
-    return result == strlen(pattern);
+    unsigned long ulStartTime=millis();
+    do
+    {
+        getLine(uiTimeout, readLine, 10);
+        if(strstr(readLine, pattern))
+        {
+            return true;
+        }
+    }while(millis()<uiTimeout+ulStartTime);
+    return false;
 }
 
 void rn4020::getLine(unsigned long uiTimeout, char* buf, byte buflength)

@@ -8,17 +8,24 @@ class rn4020
 public:
     typedef enum
     {
-	SRV_SERVICES,
-	SUP_FEATURES,
-	BAUDRATE
+        SRV_SERVICES,
+        SUP_FEATURES,
+        BAUDRATE,
+        TX_POWER
     }SETGET;
+    typedef enum
+    {
+        IAS //Immediate Alert Service
+    }SERVICES;
     rn4020(HardwareSerial &s, byte pinCts, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive);
     bool begin(unsigned long baudrate);
     bool set(SETGET st, unsigned long ulValue);
     bool doFactoryDefault();
     bool doReboot(unsigned long baudrate);
+    bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
+    bool createService(SERVICES srv);
 private:
-    void getLine(unsigned long uiTimeout, char *buf, byte buflength);
+    void getLine(unsigned long uiTimeout, char *readLine, byte buflength);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
     bool isModuleActive(unsigned long uiTimeout);
     bool waitForStartup(unsigned long baudrate);
