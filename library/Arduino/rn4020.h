@@ -8,13 +8,6 @@ class rn4020
 public:
     typedef enum
     {
-        SG_SRV_SERVICES,
-        SG_SUP_FEATURES,
-        SG_BAUDRATE,
-        SG_TX_POWER
-    }SETGET;
-    typedef enum
-    {
         SRV_IAS //Immediate Alert Service
     }SERVICES;
     typedef enum
@@ -23,15 +16,21 @@ public:
         SU_DISCONNECTED,
         SU_UNKNOWN
     }STATUS_UPDATES;
+    typedef enum
+    {
+        PERIPHERAL
+    }ROLES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive);
     bool begin(unsigned long baudrate);
     bool update(STATUS_UPDATES& su);
-    bool set(SETGET st, unsigned long ulValue);
     bool doFactoryDefault();
     bool doReboot(unsigned long baudrate);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool createService(SERVICES srv);
     bool dummy();
+    bool setRole(ROLES rl);
+    bool setTxPower(byte pwr);
+    bool setBaudrate(unsigned long baud);
 private:
     bool getLine(char **pReadLine);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);

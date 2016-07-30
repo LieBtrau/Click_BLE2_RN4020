@@ -82,6 +82,72 @@ bool rn4020::update(rn4020::STATUS_UPDATES& su)
     return true;
 }
 
+bool rn4020::setRole(rn4020::ROLES rl)
+{
+    switch(rl)
+    {
+    case PERIPHERAL:
+        //Services: Device Information + Battery Level
+        ble2_set_server_services(0xC0000000);
+        if(!waitForReply(2000,"AOK"))
+        {
+            return false;
+        }
+        //Enable authentication with Keyboard and display as IO-capabilities
+        ble2_set_supported_features(0x00480000);
+        return waitForReply(2000,"AOK");
+    default:
+        return false;
+    }
+}
+
+bool rn4020::setTxPower(byte pwr)
+{
+    if(pwr>7)
+    {
+        return false;
+    }
+    ble2_set_transmission_power((tx_pwr_t)pwr);
+    return waitForReply(2000,"AOK");
+}
+
+bool rn4020::setBaudrate(unsigned long baud)
+{
+    switch(baud)
+    {
+    case 2400:
+        ble2_set_baud_rate(BR_2400);
+        break;
+    case 9600:
+        ble2_set_baud_rate(BR_9600);
+        break;
+    case 19200:
+        ble2_set_baud_rate(BR_19200);
+        break;
+    case 38400:
+        ble2_set_baud_rate(BR_38400);
+        break;
+    case 115200:
+        ble2_set_baud_rate(BR_115200);
+        break;
+    case 230400:
+        ble2_set_baud_rate(BR_230400);
+        break;
+    case 460800:
+        ble2_set_baud_rate(BR_460800);
+        break;
+    case 921600:
+        ble2_set_baud_rate(BR_921600);
+        break;
+    default:
+#if DEBUG_LEVEL >= DEBUG_ALL
+        sPortDebug->println("Unknown baud rate");
+#endif
+        return false;
+    }
+    return waitForReply(2000,"AOK");
+}
+
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
  * power.  Take this into account when designing a PCB with this module.  You should be able to toggle the power
  * of the RN4020 with a GPIO of your MCU.
@@ -124,73 +190,6 @@ bool rn4020::doReboot(unsigned long baudrate)
 }
 
 
-bool rn4020::set(rn4020::SETGET st, unsigned long ulValue)
-{
-
-    switch(st)
-    {
-    case SG_SRV_SERVICES:
-        ble2_set_server_services(ulValue);
-        break;
-    case SG_SUP_FEATURES:
-        ble2_set_supported_features(ulValue);
-        break;
-    case SG_BAUDRATE:
-        switch(ulValue)
-        {
-        case 2400:
-            ble2_set_baud_rate(BR_2400);
-            break;
-        case 9600:
-            ble2_set_baud_rate(BR_9600);
-            break;
-        case 19200:
-            ble2_set_baud_rate(BR_19200);
-            break;
-        case 38400:
-            ble2_set_baud_rate(BR_38400);
-            break;
-        case 115200:
-            ble2_set_baud_rate(BR_115200);
-            break;
-        case 230400:
-            ble2_set_baud_rate(BR_230400);
-            break;
-        case 460800:
-            ble2_set_baud_rate(BR_460800);
-            break;
-        case 921600:
-            ble2_set_baud_rate(BR_921600);
-            break;
-        default:
-#if DEBUG_LEVEL >= DEBUG_ALL
-            sPortDebug->println("Unknown baud rate");
-#endif
-            return false;
-        }
-        break;
-    case SG_TX_POWER:
-        if(ulValue>7)
-        {
-            return false;
-        }
-        ble2_set_transmission_power((tx_pwr_t)ulValue);
-        break;
-    default:
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("Undefined set command");
-#endif
-        return false;
-    }
-    if(!waitForReply(2000,"AOK"))
-    {
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("No response for set");
-#endif
-        return false;
-    }
-    return true;
-}
 
 bool rn4020::createService(rn4020::SERVICES srv)
 {
