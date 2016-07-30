@@ -20,6 +20,12 @@ public:
     {
         PERIPHERAL
     }ROLES;
+    typedef enum
+    {
+        NORMAL,
+        DEEP_SLEEP,
+        DORMANT
+    }OPERATING_MODES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive);
     bool begin(unsigned long baudrate);
     bool update(STATUS_UPDATES& su);
@@ -31,6 +37,7 @@ public:
     bool setRole(ROLES rl);
     bool setTxPower(byte pwr);
     bool setBaudrate(unsigned long baud);
+    bool setOperatingMode(OPERATING_MODES om);
 private:
     bool getLine(char **pReadLine);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);

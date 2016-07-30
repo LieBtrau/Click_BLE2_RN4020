@@ -148,6 +148,42 @@ bool rn4020::setBaudrate(unsigned long baud)
     return waitForReply(2000,"AOK");
 }
 
+//http://microchip.wikidot.com/ble:rn4020-power-states
+bool rn4020::setOperatingMode(OPERATING_MODES om)
+{
+    bool bSuccess=false;
+    bool bInNormalMode=false;
+    switch (om) {
+    case NORMAL:
+        digitalWrite(_pinWake_sw_7, HIGH);
+        digitalWrite(_pinWake_hw_15, HIGH);
+        bSuccess=isModuleActive(2000);
+        digitalWrite(_pinWake_hw_15, LOW);
+        return bSuccess;
+    case DEEP_SLEEP:
+        bInNormalMode=isModuleActive(2000);
+        digitalWrite(_pinWake_sw_7, LOW);
+        if(bInNormalMode)
+        {
+            bSuccess=waitForReply(1000,"END\r\n");
+        }
+        digitalWrite(_pinWake_hw_15, HIGH);
+        delay(10);
+        digitalWrite(_pinWake_hw_15, LOW);
+        return (!bInNormalMode) || bSuccess;
+    case DORMANT:
+        digitalWrite(_pinWake_sw_7, HIGH);
+        bInNormalMode=isModuleActive(2000);
+        ble2_dormant_mode_enable();
+        //no reply on UART
+        delay(200);
+        digitalWrite(_pinWake_sw_7, LOW);
+        return bInNormalMode;
+    default:
+        break;
+    }
+}
+
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
  * power.  Take this into account when designing a PCB with this module.  You should be able to toggle the power
  * of the RN4020 with a GPIO of your MCU.
@@ -155,11 +191,7 @@ bool rn4020::setBaudrate(unsigned long baud)
  */
 bool rn4020::doFactoryDefault()
 {
-    digitalWrite(_pinWake_sw_7, HIGH);
-    if(!isModuleActive(2000))
-    {
-        return false;
-    }
+    setOperatingMode(NORMAL);
     delay(200);
 #if DEBUG_LEVEL >= DEBUG_ALL
     sPortDebug->println("Forcing factory default.");
