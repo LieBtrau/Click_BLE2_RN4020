@@ -12,12 +12,6 @@ public:
     }SERVICES;
     typedef enum
     {
-        SU_CONNECTED,
-        SU_DISCONNECTED,
-        SU_UNKNOWN
-    }STATUS_UPDATES;
-    typedef enum
-    {
         PERIPHERAL
     }ROLES;
     typedef enum
@@ -28,16 +22,17 @@ public:
     }OPERATING_MODES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive);
     bool begin(unsigned long baudrate);
-    bool update(STATUS_UPDATES& su);
+    void loop();
     bool doFactoryDefault();
     bool doReboot(unsigned long baudrate);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool createService(SERVICES srv);
-    bool dummy();
+    bool dummy(void(*function)());
     bool setRole(ROLES rl);
     bool setTxPower(byte pwr);
     bool setBaudrate(unsigned long baud);
     bool setOperatingMode(OPERATING_MODES om);
+    void setConnectionListener(void (*ftConnection)(bool));
 private:
     bool getLine(char **pReadLine);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
@@ -49,6 +44,7 @@ private:
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
     byte _pinEnPwr;
+    void (*_ftConnection)(bool bUp);
 };
 
 #endif // RN4020_H

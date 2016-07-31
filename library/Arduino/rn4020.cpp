@@ -32,7 +32,8 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPw
     _pinWake_sw_7(pinWake_sw),
     _pinWake_hw_15(pinWake_hw),
     _pinEnPwr(pinEnPwr),
-    _pinActive_12(pinBtActive)
+    _pinActive_12(pinBtActive),
+    _ftConnection(0)
 {
     sPort=&s;
     sPortDebug=&sw;
@@ -55,23 +56,36 @@ bool rn4020::begin(unsigned long baudrate)
     return waitForStartup(baudrate);
 }
 
-bool rn4020::update(rn4020::STATUS_UPDATES& su)
+void rn4020::setConnectionListener(void (*ftConnection)(bool))
+{
+    _ftConnection=ftConnection;
+#if DEBUG_LEVEL >= DEBUG_ALL
+        sPortDebug->print("Function set: ");
+        sPortDebug->println((unsigned)_ftConnection, HEX);
+#endif
+
+}
+
+
+void rn4020::loop()
 {
     char* readLine;
-    su=SU_UNKNOWN;
+    bool bEventHandled=false;
     if(!getLine(&readLine))
     {
-        return false;
+        return;
     }
-    if(strstr(readLine, "Connected"))
+    if(strstr(readLine, "Connected") && _ftConnection)
     {
-        su=SU_CONNECTED;
+        _ftConnection(true);
+        bEventHandled=true;
     }
-    if(strstr(readLine, "Connection End"))
+    if(strstr(readLine, "Connection End") && _ftConnection)
     {
-        su=SU_DISCONNECTED;
+        _ftConnection(false);
+        bEventHandled=true;
     }
-    if(su==SU_UNKNOWN)
+    if(!bEventHandled)
     {
         //If no matching string found
 #if DEBUG_LEVEL >= DEBUG_ALL
@@ -79,7 +93,6 @@ bool rn4020::update(rn4020::STATUS_UPDATES& su)
         sPortDebug->println(readLine);
 #endif
     }
-    return true;
 }
 
 bool rn4020::setRole(rn4020::ROLES rl)
@@ -264,20 +277,20 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
     return waitForReply(2000,"AOK");
 }
 
-bool rn4020::dummy()
+bool rn4020::dummy(void (*function)())
 {
-    char handle[10];
-    if(!getHandle("1802","2A06", handle))
-    {
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("GetHandle Failed!!");
-#endif
-    }else
-    {
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println((char*)handle);
-#endif
-    }
+//    char handle[10];
+//    if(!getHandle("1802","2A06", handle))
+//    {
+//#if DEBUG_LEVEL >= DEBUG_ALL
+//        sPortDebug->println("GetHandle Failed!!");
+//#endif
+//    }else
+//    {
+//#if DEBUG_LEVEL >= DEBUG_ALL
+//        sPortDebug->println((char*)handle);
+//#endif
+//    }
 }
 
 bool rn4020::waitForStartup(unsigned long baudrate)
