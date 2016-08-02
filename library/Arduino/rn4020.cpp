@@ -33,10 +33,12 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPw
     _pinWake_hw_15(pinWake_hw),
     _pinEnPwr(pinEnPwr),
     _pinActive_12(pinBtActive),
-    _ftConnection(0)
+    _ftConnection(0),
+    _characteristicCount(0)
 {
     sPort=&s;
     sPortDebug=&sw;
+    memset(_lastCreatedService,'\0',sizeof(_lastCreatedService));
     ble2_hal_init();
 }
 
@@ -59,11 +61,6 @@ bool rn4020::begin(unsigned long baudrate)
 void rn4020::setConnectionListener(void (*ftConnection)(bool))
 {
     _ftConnection=ftConnection;
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->print("Function set: ");
-        sPortDebug->println((unsigned)_ftConnection, HEX);
-#endif
-
 }
 
 
@@ -83,6 +80,41 @@ void rn4020::loop()
     if(strstr(readLine, "Connection End") && _ftConnection)
     {
         _ftConnection(false);
+        bEventHandled=true;
+    }
+    if(!strncmp(readLine, "WV,",3))
+    {
+        //Local server characteristic has been written by remote client
+        char* pch= strtok(readLine,",");
+        if(!pch)
+        {
+            return;
+        }
+        pch= strtok(NULL, ",");
+        if(!pch)
+        {
+            return;
+        }
+        //Get the handle of the changed characteristic
+        word handle;
+        if(sscanf(pch, "%x", &handle)!=1)
+        {
+            return;
+        }
+        //look up the matching characteristic in our local list
+        for(byte i=0;i<_characteristicCount;i++)
+        {
+            if(_characteristicList[i]->getHandle()==handle)
+            {
+                pch= strtok(NULL, ",");
+                if(!pch)
+                {
+                    return;
+                }
+                //Call the event handler attached to this characteristic
+                _characteristicList[i]->callListener(pch);
+            }
+        }
         bEventHandled=true;
     }
     if(!bEventHandled)
@@ -234,33 +266,39 @@ bool rn4020::doReboot(unsigned long baudrate)
     return waitForStartup(baudrate);
 }
 
-
-
-bool rn4020::createService(rn4020::SERVICES srv)
+bool rn4020::addCharacteristic(btCharacteristic* bt)
 {
-    //Create service: https://www.bluetooth.com/specifications/gatt/services
-    switch(srv)
+    char buf[50];
+    bt->getUuidService(buf);
+    if(strcmp(_lastCreatedService, buf))
     {
-    case SRV_IAS:
-        ble2_set_private_service_uuid("1802");
-        break;
-    default:
-        return false;
+        //Service not created in previous call.  Create it now.
+        strcpy(_lastCreatedService, buf);
+        ble2_set_private_service_uuid(_lastCreatedService);
+        if(!waitForReply(2000,"AOK"))
+        {
+            return false;
+        }
     }
+    //Set characteristics of the created service:
+    bt->getUuidCharacteristic(buf);
+    ble2_set_private_characteristics(buf,bt->getProperty(),bt->getValueLength());
     if(!waitForReply(2000,"AOK"))
     {
         return false;
     }
-    //Set characteristics of the created service: https://www.bluetooth.com/specifications/gatt/characteristics
-    switch(srv)
+    //Get handle of the created characteristic, so the callback functionality can work
+    if(!getHandle(bt))
     {
-    case SRV_IAS:
-        ble2_set_private_characteristics("2A06","04",1);//"write without response", 1 byte maximum
-        break;
-    default:
         return false;
     }
-    return waitForReply(2000,"AOK");
+    _characteristicList = (btCharacteristic**) realloc(_characteristicList, (_characteristicCount + 1) * sizeof(btCharacteristic*));
+    if(!_characteristicList)
+    {
+        return false;
+    }
+    _characteristicList[_characteristicCount++]=bt;
+    return true;
 }
 
 bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
@@ -279,18 +317,18 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
 
 bool rn4020::dummy(void (*function)())
 {
-//    char handle[10];
-//    if(!getHandle("1802","2A06", handle))
-//    {
-//#if DEBUG_LEVEL >= DEBUG_ALL
-//        sPortDebug->println("GetHandle Failed!!");
-//#endif
-//    }else
-//    {
-//#if DEBUG_LEVEL >= DEBUG_ALL
-//        sPortDebug->println((char*)handle);
-//#endif
-//    }
+    //    char handle[10];
+    //    if(!getHandle("1802","2A06", handle))
+    //    {
+    //#if DEBUG_LEVEL >= DEBUG_ALL
+    //        sPortDebug->println("GetHandle Failed!!");
+    //#endif
+    //    }else
+    //    {
+    //#if DEBUG_LEVEL >= DEBUG_ALL
+    //        sPortDebug->println((char*)handle);
+    //#endif
+    //    }
 }
 
 bool rn4020::waitForStartup(unsigned long baudrate)
@@ -313,22 +351,17 @@ bool rn4020::waitForStartup(unsigned long baudrate)
     return true;
 }
 
-bool rn4020::getHandle(const char* service, const char* characteristic, char handle[])
+bool rn4020::getHandle(btCharacteristic* bt)
 {
-    ble2_list_server_services();
     const byte BUFFSIZE=200;
     char buf[BUFFSIZE];
-    if(!handle)
-    {
-        return false;
-    }
+    char buf2[50];
+    bt->getUuidService(buf2);
+    ble2_list_server_services();
     if(!waitForReply(2000, "END\r\n", buf, BUFFSIZE))
     {
         return false;
     }
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->println(buf);
-#endif
     char* pch= strtok (buf,"\r\n");
     byte state=0;
     do
@@ -337,9 +370,10 @@ bool rn4020::getHandle(const char* service, const char* characteristic, char han
         {
         case 0:
             //Nothing found yet, split string in lines;
-            if(strstr(pch,service))
+            if(strstr(pch,buf2))
             {
                 state=1;
+                bt->getUuidCharacteristic(buf2);
 #if DEBUG_LEVEL >= DEBUG_ALL
                 sPortDebug->println("Service found");
 #endif
@@ -355,12 +389,13 @@ bool rn4020::getHandle(const char* service, const char* characteristic, char han
 #endif
                 return false;
             }
-            if(strstr(pch, characteristic))
+            if(strstr(pch, buf2))
             {
                 state=2;
             }
             else
             {
+                //get next characteristic in this service
                 pch = strtok (NULL, "\r\n");
             }
             break;
@@ -370,8 +405,12 @@ bool rn4020::getHandle(const char* service, const char* characteristic, char han
             pch=strtok(NULL,",");
             if(pch)
             {
-                strcpy(handle, pch);
-                return true;
+                word handle;
+                if(sscanf(pch, "%x", &handle)==1)
+                {
+                    bt->setHandle(handle);
+                    return true;
+                }
             }
         }
     }while (pch != NULL);

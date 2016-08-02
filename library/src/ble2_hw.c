@@ -581,7 +581,7 @@ void ble2_write_server_characteristic_value_via_UUID (char* UUID, char* content)
     ble2_hal_send(tmp);
 }
 
-uint8_t ble2_set_private_characteristics(const char* UUID, const char* bitmap_characteristic, uint8_t max_data_len)
+uint8_t ble2_set_private_characteristics(const char* UUID, uint8_t bitmap_characteristic, uint8_t max_data_len)
 {
     char tmp[100] = {0};
     char tmp2[10];
@@ -591,8 +591,8 @@ uint8_t ble2_set_private_characteristics(const char* UUID, const char* bitmap_ch
 
     strcpy(tmp, "PC,");
     strcat(tmp, UUID);
-    strcat(tmp,",");
-    strcat(tmp,bitmap_characteristic);
+    sprintf(tmp2,",%02X",bitmap_characteristic);
+    strcat(tmp,tmp2);
     sprintf(tmp2,",%02X",max_data_len);
     strcat(tmp,tmp2);
     ble2_hal_send(tmp);

@@ -2,14 +2,11 @@
 #define RN4020_H
 #include "Arduino.h"
 #include <SoftwareSerial.h>
+#include "btcharacteristic.h"
 
 class rn4020
 {
 public:
-    typedef enum
-    {
-        SRV_IAS //Immediate Alert Service
-    }SERVICES;
     typedef enum
     {
         PERIPHERAL
@@ -26,25 +23,28 @@ public:
     bool doFactoryDefault();
     bool doReboot(unsigned long baudrate);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
-    bool createService(SERVICES srv);
     bool dummy(void(*function)());
     bool setRole(ROLES rl);
     bool setTxPower(byte pwr);
     bool setBaudrate(unsigned long baud);
     bool setOperatingMode(OPERATING_MODES om);
     void setConnectionListener(void (*ftConnection)(bool));
+    bool addCharacteristic(btCharacteristic* bt);
 private:
     bool getLine(char **pReadLine);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
     bool waitForReply(unsigned long uiTimeout, const char *pattern, char buf[], byte buffsize);
     bool isModuleActive(unsigned long uiTimeout);
     bool waitForStartup(unsigned long baudrate);
-    bool getHandle(const char* service, const char* characteristic, char handle[]);
+    bool getHandle(btCharacteristic *bt);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
     byte _pinEnPwr;
     void (*_ftConnection)(bool bUp);
+    btCharacteristic** _characteristicList;
+    byte _characteristicCount;
+    char _lastCreatedService[40];
 };
 
 #endif // RN4020_H
