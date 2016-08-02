@@ -133,7 +133,7 @@ bool rn4020::setRole(rn4020::ROLES rl)
     {
     case PERIPHERAL:
         //Services: Device Information + Battery Level
-        ble2_set_server_services(0xC0000000);
+        ble2_set_server_services(0xC0000001);
         if(!waitForReply(2000,"AOK"))
         {
             return false;
@@ -269,6 +269,11 @@ bool rn4020::doReboot(unsigned long baudrate)
 bool rn4020::addCharacteristic(btCharacteristic* bt)
 {
     char buf[50];
+    if(getHandle(bt))
+    {
+        //Characteristic already exists
+        return true;
+    }
     bt->getUuidService(buf);
     if(strcmp(_lastCreatedService, buf))
     {
@@ -282,7 +287,7 @@ bool rn4020::addCharacteristic(btCharacteristic* bt)
     }
     //Set characteristics of the created service:
     bt->getUuidCharacteristic(buf);
-    ble2_set_private_characteristics(buf,bt->getProperty(),bt->getValueLength());
+    ble2_set_private_characteristics(buf,bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
     if(!waitForReply(2000,"AOK"))
     {
         return false;
@@ -353,7 +358,7 @@ bool rn4020::waitForStartup(unsigned long baudrate)
 
 bool rn4020::getHandle(btCharacteristic* bt)
 {
-    const byte BUFFSIZE=200;
+    const byte BUFFSIZE=250;
     char buf[BUFFSIZE];
     char buf2[50];
     bt->getUuidService(buf2);
@@ -464,6 +469,9 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern, char buf
         }
         buf[index]='\0';
     }while(millis()<ulStartTime+uiTimeout && !strstr(buf, pattern));
+//#if DEBUG_LEVEL >= DEBUG_ALL
+//        sPortDebug->println(buf);
+//#endif
     return strstr(buf, pattern);
 }
 

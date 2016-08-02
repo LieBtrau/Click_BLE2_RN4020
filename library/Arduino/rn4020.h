@@ -33,7 +33,7 @@ public:
 private:
     bool getLine(char **pReadLine);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
-    bool waitForReply(unsigned long uiTimeout, const char *pattern, char buf[], byte buffsize);
+    bool waitForReply(unsigned long uiTimeout, const char *pattern, char buf[],  byte buffsize);
     bool isModuleActive(unsigned long uiTimeout);
     bool waitForStartup(unsigned long baudrate);
     bool getHandle(btCharacteristic *bt);

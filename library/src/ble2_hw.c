@@ -581,7 +581,8 @@ void ble2_write_server_characteristic_value_via_UUID (char* UUID, char* content)
     ble2_hal_send(tmp);
 }
 
-uint8_t ble2_set_private_characteristics(const char* UUID, uint8_t bitmap_characteristic, uint8_t max_data_len)
+uint8_t ble2_set_private_characteristics(const char* UUID, uint8_t bitmap_characteristic, uint8_t max_data_len,
+                                         uint8_t bitmap_security)
 {
     char tmp[100] = {0};
     char tmp2[10];
@@ -595,6 +596,11 @@ uint8_t ble2_set_private_characteristics(const char* UUID, uint8_t bitmap_charac
     strcat(tmp,tmp2);
     sprintf(tmp2,",%02X",max_data_len);
     strcat(tmp,tmp2);
+    if(bitmap_security)
+    {
+        sprintf(tmp2,",%02X",bitmap_security);
+        strcat(tmp,tmp2);
+    }
     ble2_hal_send(tmp);
     return 0;
 }
@@ -622,7 +628,7 @@ void ble2_set_private_service_uuid(const char* uuid)
     ble2_hal_send(tmp);
 }
 
-void ble2_private_service_clear_all_()
+void ble2_private_service_clear_all()
 {
     ble2_hal_send("PZ");
 }

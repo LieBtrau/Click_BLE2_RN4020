@@ -558,7 +558,7 @@ void ble2_write_server_characteristic_value_via_UUID (char* UUID, char* content)
  * that the private characteristic holds. The real data size can be smaller. The maximum
  * data size of a characteristic cannot exceed 20 bytes.
  */
-uint8_t ble2_set_private_characteristics(const char* UUID, uint8_t bitmap_characteristic, uint8_t max_data_len);
+uint8_t ble2_set_private_characteristics(const char* UUID, uint8_t bitmap_characteristic, uint8_t max_data_len, uint8_t bitmap_security);
 /**
  * @brief
  * Sets the primary UUID filter of the private service.
@@ -582,7 +582,7 @@ void ble2_set_private_service_uuid(const char* uuid);
  * @brief
  * Clears all settings of the private service and the private characteristics.
  */
-void ble2_private_service_clear_all_();
+void ble2_private_service_clear_all();
 /**
  * @brief
  * Places the RN4020 module into MLDP simulation mode
