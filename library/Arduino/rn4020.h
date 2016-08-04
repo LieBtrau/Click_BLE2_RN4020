@@ -30,13 +30,14 @@ public:
     bool setOperatingMode(OPERATING_MODES om);
     void setConnectionListener(void (*ftConnection)(bool));
     bool addCharacteristic(btCharacteristic* bt);
+    bool removePrivateCharacteristics();
 private:
-    bool getLine(char **pReadLine);
+    bool gotLine();
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
-    bool waitForReply(unsigned long uiTimeout, const char *pattern, char buf[],  byte buffsize);
     bool isModuleActive(unsigned long uiTimeout);
     bool waitForStartup(unsigned long baudrate);
-    bool getHandle(btCharacteristic *bt);
+    bool getHandle(btCharacteristic* pbt);
+    void cyclePower(OPERATING_MODES om);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15

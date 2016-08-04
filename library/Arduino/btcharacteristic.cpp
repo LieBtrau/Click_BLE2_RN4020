@@ -8,28 +8,21 @@ btCharacteristic::btCharacteristic(const char* uuid_service, const char* uuid_ch
     _propertyBmp(propertyBmp),
     _valueLength(valueLength),
     _securityBmp(securityBmp),
-    _ftListener(0)
+    _ftListener(0),
+    _handle(0)
 {
     _uuid_service = cleanupUuid(uuid_service);
     _uuid_characteristic=cleanupUuid(uuid_characteristic);
 }
 
-void btCharacteristic::getUuidService(char *buf)
+const char *btCharacteristic::getUuidService()
 {
-    if(!buf)
-    {
-        return;
-    }
-    strcpy(buf, _uuid_service);
+    return _uuid_service;
 }
 
-void btCharacteristic::getUuidCharacteristic(char *buf)
+const char *btCharacteristic::getUuidCharacteristic()
 {
-    if(!buf)
-    {
-        return;
-    }
-    strcpy(buf, _uuid_characteristic);
+    return _uuid_characteristic;
 }
 
 byte btCharacteristic::getProperty()

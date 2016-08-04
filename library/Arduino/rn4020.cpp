@@ -4,6 +4,9 @@
 static HardwareSerial* sPort;
 static SoftwareSerial* sPortDebug;
 extern SoftwareSerial sw;
+const byte BUFFSIZE=250;
+static char rxbuf[BUFFSIZE];
+static byte index=0;
 
 #ifdef __cplusplus
 extern "C"{
@@ -48,14 +51,21 @@ bool rn4020::begin(unsigned long baudrate)
     pinMode(_pinWake_hw_15, OUTPUT);
     pinMode(_pinWake_sw_7, OUTPUT);
     pinMode(_pinActive_12, INPUT);
+    cyclePower(NORMAL);
+    return waitForStartup(baudrate);
+}
 
+void rn4020::cyclePower(OPERATING_MODES om)
+{
     digitalWrite(_pinWake_hw_15, LOW);
     digitalWrite(_pinWake_sw_7, LOW);
     digitalWrite(_pinEnPwr, HIGH);//module OFF
     delay(100);
     digitalWrite(_pinEnPwr, LOW);//module ON
-    digitalWrite(_pinWake_sw_7, HIGH);
-    return waitForStartup(baudrate);
+    if(om==NORMAL)
+    {
+        digitalWrite(_pinWake_sw_7, HIGH);
+    }
 }
 
 void rn4020::setConnectionListener(void (*ftConnection)(bool))
@@ -66,26 +76,26 @@ void rn4020::setConnectionListener(void (*ftConnection)(bool))
 
 void rn4020::loop()
 {
-    char* readLine;
     bool bEventHandled=false;
-    if(!getLine(&readLine))
+    if(!gotLine())
     {
         return;
     }
-    if(strstr(readLine, "Connected") && _ftConnection)
+    index=0;
+    if(strstr(rxbuf, "Connected") && _ftConnection)
     {
         _ftConnection(true);
         bEventHandled=true;
     }
-    if(strstr(readLine, "Connection End") && _ftConnection)
+    if(strstr(rxbuf, "Connection End") && _ftConnection)
     {
         _ftConnection(false);
         bEventHandled=true;
     }
-    if(!strncmp(readLine, "WV,",3))
+    if(!strncmp(rxbuf, "WV,",3))
     {
         //Local server characteristic has been written by remote client
-        char* pch= strtok(readLine,",");
+        char* pch= strtok(rxbuf,",");
         if(!pch)
         {
             return;
@@ -122,7 +132,7 @@ void rn4020::loop()
         //If no matching string found
 #if DEBUG_LEVEL >= DEBUG_ALL
         sPortDebug->print("Unknown input: ");
-        sPortDebug->println(readLine);
+        sPortDebug->println(rxbuf);
 #endif
     }
 }
@@ -153,6 +163,12 @@ bool rn4020::setTxPower(byte pwr)
         return false;
     }
     ble2_set_transmission_power((tx_pwr_t)pwr);
+    return waitForReply(2000,"AOK");
+}
+
+bool rn4020::removePrivateCharacteristics()
+{
+    ble2_private_service_clear_all();
     return waitForReply(2000,"AOK");
 }
 
@@ -261,24 +277,22 @@ bool rn4020::doReboot(unsigned long baudrate)
     delay(1);
     digitalWrite(A0, LOW);
     ble2_device_reboot();
-    //ProTrinket 3V gets framing errors when trying to receive the "Reboot".
+    //ProTrinket 3V gets framing errors when trying to receive the "Reboot" at 115200baud.
     //waitForReply(2000,"Reboot");
     return waitForStartup(baudrate);
 }
 
 bool rn4020::addCharacteristic(btCharacteristic* bt)
 {
-    char buf[50];
-    if(getHandle(bt))
+    if(bt->getHandle() || (getHandle(bt) && bt->getHandle()))
     {
-        //Characteristic already exists
+        //handle already exists
         return true;
     }
-    bt->getUuidService(buf);
-    if(strcmp(_lastCreatedService, buf))
+    if(strcmp(_lastCreatedService, bt->getUuidService()))
     {
         //Service not created in previous call.  Create it now.
-        strcpy(_lastCreatedService, buf);
+        strcpy(_lastCreatedService, bt->getUuidService());
         ble2_set_private_service_uuid(_lastCreatedService);
         if(!waitForReply(2000,"AOK"))
         {
@@ -286,9 +300,13 @@ bool rn4020::addCharacteristic(btCharacteristic* bt)
         }
     }
     //Set characteristics of the created service:
-    bt->getUuidCharacteristic(buf);
-    ble2_set_private_characteristics(buf,bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
+    ble2_set_private_characteristics(bt->getUuidCharacteristic(),bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
     if(!waitForReply(2000,"AOK"))
+    {
+        return false;
+    }
+    //Created characteristics only become available after reboot.
+    if(!doReboot(2400))
     {
         return false;
     }
@@ -346,39 +364,34 @@ bool rn4020::waitForStartup(unsigned long baudrate)
         return false;
     }
     //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART
-    if(!waitForReply(2000,"CMD"))
-    {
-        return false;
-    }
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->println("RN4020 Module found");
-#endif
-    return true;
+    return waitForReply(2000,"CMD");
 }
 
-bool rn4020::getHandle(btCharacteristic* bt)
+
+bool rn4020::getHandle(btCharacteristic* pbt)
 {
-    const byte BUFFSIZE=250;
-    char buf[BUFFSIZE];
-    char buf2[50];
-    bt->getUuidService(buf2);
+    char* pch;
+    byte state=0;
+
     ble2_list_server_services();
-    if(!waitForReply(2000, "END\r\n", buf, BUFFSIZE))
+    if(!waitForReply(2000, "END\r\n"))
     {
         return false;
     }
-    char* pch= strtok (buf,"\r\n");
-    byte state=0;
+
+    pch = strtok (rxbuf,"\r\n");
     do
     {
+        //#if DEBUG_LEVEL >= DEBUG_ALL
+        //        sPortDebug->println(pch);
+        //#endif
         switch(state)
         {
         case 0:
             //Nothing found yet, split string in lines;
-            if(strstr(pch,buf2))
+            if(strstr(pch,pbt->getUuidService()))
             {
                 state=1;
-                bt->getUuidCharacteristic(buf2);
 #if DEBUG_LEVEL >= DEBUG_ALL
                 sPortDebug->println("Service found");
 #endif
@@ -394,7 +407,7 @@ bool rn4020::getHandle(btCharacteristic* bt)
 #endif
                 return false;
             }
-            if(strstr(pch, buf2))
+            if(strstr(pch, pbt->getUuidCharacteristic()))
             {
                 state=2;
             }
@@ -413,7 +426,11 @@ bool rn4020::getHandle(btCharacteristic* bt)
                 word handle;
                 if(sscanf(pch, "%x", &handle)==1)
                 {
-                    bt->setHandle(handle);
+#if DEBUG_LEVEL >= DEBUG_ALL
+                    sPortDebug->println("Setting handle");
+                    sPortDebug->println(handle, HEX);
+#endif
+                    pbt->setHandle(handle);
                     return true;
                 }
             }
@@ -448,74 +465,63 @@ bool rn4020::isModuleActive(unsigned long uiTimeout)
 }
 
 //Read multiple lines and search for pattern
-bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern, char buf[], byte buffsize)
+bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
 {
-    if(!buf)
+    rxbuf[0]='\0';
+    index=0;
+    if(!pattern || !strlen(pattern))
     {
+#if DEBUG_LEVEL >= DEBUG_ALL
+        sPortDebug->println("No pattern defined");
+#endif
         return false;
     }
-    buf[0]='\0';
     unsigned long ulStartTime=millis();
-    byte index=0;
     do{
-        if(!sPort->available())
-        {
-            continue;
-        }
-        char c=sPort->read();
-        if((((byte)c)!=0xFF) && (((byte)c)!=0x00))
-        {
-            buf[index<buffsize-1 ? index++ : index=0]=c;
-        }
-        buf[index]='\0';
-    }while(millis()<ulStartTime+uiTimeout && !strstr(buf, pattern));
-//#if DEBUG_LEVEL >= DEBUG_ALL
-//        sPortDebug->println(buf);
-//#endif
-    return strstr(buf, pattern);
-}
-
-bool rn4020::waitForReply(unsigned long uiTimeout, const char* pattern)
-{
-    unsigned long ulStartTime=millis();
-    char* readLine=0;
-    do
+        gotLine();
+    }while(millis()<ulStartTime+uiTimeout && (!strstr(rxbuf, pattern)));
+    index=0;
+#if DEBUG_LEVEL >= DEBUG_ALL
+    //    sPortDebug->print("Pattern: ");
+    //    sPortDebug->println(pattern);
+    //    sPortDebug->println((unsigned long)strstr(rxbuf, pattern), DEC);
+    char* pch=rxbuf;
+    char b=0,c=0;
+    sPortDebug->print("RX: ");
+    while(*pch)
     {
-        if(getLine(&readLine) && strstr(readLine, pattern))
+        if(*pch>27)
         {
-            return true;
+            sPortDebug->print(*pch);
         }
-    }while(millis()<uiTimeout+ulStartTime);
-    return false;
+        b=c;
+        c=*pch;
+        if(b=='\r' && c=='\n')
+        {
+            sPortDebug->print("\r\nRX: ");
+        }
+        pch++;
+    }
+    sPortDebug->println();
+#endif
+    return strstr(rxbuf, pattern);
 }
 
-bool rn4020::getLine(char** pReadLine)
+bool rn4020::gotLine()
 {
-    const byte BUFFSIZE=40;
-    static char buf[BUFFSIZE];
-    static byte index=0;
-    static char b=0,c=0;
     if(!sPort->available())
     {
         return false;
     }
-    b=c;
-    c=sPort->read();
-    if((((byte)c)!=0xFF) && (((byte)c)!=0x00))
+    char c=sPort->read();
+    if(c!='\xFF' && c!='\0')
     {
-        buf[index<BUFFSIZE-1 ? index++ : index=0]=c;
-#if DEBUG_LEVEL >= DEBUG_ALL
-        char charbuf[20];
-        sprintf(charbuf,"RX: %c \t\t%02x",c>27?c:'.',(byte)c);
-        sPortDebug->println(charbuf);
-#endif
+        rxbuf[index]=c;
+        rxbuf[++index]='\0';
+        if(index==BUFFSIZE-1)
+        {
+            index=0;
+        }
     }
-    if(b=='\r' && c=='\n')
-    {
-        *pReadLine=buf;
-        buf[index]='\0';
-        index=0;
-        return true;
-    }
-    return false;
+    return strstr(rxbuf,"\r\n");
 }

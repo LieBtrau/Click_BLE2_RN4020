@@ -25,8 +25,8 @@ public:
                      byte valueLength, SECURITY_FLAGS securityBmp);
     void setListener(void (*ftListener)(char*));
     void setHandle(word handle);
-    void getUuidService(char* buf);
-    void getUuidCharacteristic(char* buf);
+    const char* getUuidService();
+    const char* getUuidCharacteristic();
     byte getProperty();
     byte getValueLength();
     word getHandle();
