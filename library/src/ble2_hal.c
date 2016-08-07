@@ -38,12 +38,12 @@ static void ( *write_text_p )( unsigned char *_data );
       defined ( __MIKROC_PRO_FOR_FT90x__ )
 static void ( *write_uart_p )( unsigned char _data );
 static void ( *write_text_p )( unsigned char *_data );
-#elif defined (ARDUINO_ARCH_AVR)
+#elif defined (ARDUINO)
 #include <string.h>
-void UART_Wr_Ptr(unsigned char _data);
-void UART_Write_Text(unsigned char *_data);
-static void ( *write_uart_p )( unsigned char _data );
-static void ( *write_text_p )( unsigned char *_data );
+void UART_Wr_Ptr(char _data);
+void UART_Write_Text(const char *_data);
+static void ( *write_uart_p )( char _data );
+static void ( *write_text_p )( const char *_data );
 #endif
 /******************************************************************************
 * Module Variable Definitions
@@ -72,10 +72,16 @@ void ble2_hal_init()
     write_text_p = UART_Write_Text;
 }
 
-void ble2_hal_send( char *data_in )
+void ble2_hal_send( const char *data_in )
 {
-   strcat( data_in, "\n" );
-   write_text_p(data_in);
+    char* buf=malloc(strlen(data_in)+1);
+    if(buf)
+    {
+        strcpy(buf, data_in);
+        strcat(buf, "\n" );
+        write_text_p(buf);
+        free(buf);
+    }
 }
 
 /*************** END OF FUNCTIONS ***************************************************************************/

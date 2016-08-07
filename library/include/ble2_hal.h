@@ -62,7 +62,7 @@ void ble2_hal_init( void );
  * @param[in] data_in
  * 8-bit pointer to data for sending
  */
-void ble2_hal_send( char *data_in );
+void ble2_hal_send( const char *data_in );
 
 #ifdef __cplusplus
 } // extern "C"

@@ -1,17 +1,23 @@
 #include "rn4020.h"
 #include "ble2_hw.h"
 
-static HardwareSerial* sPort;
+#define DEBUG_LEVEL DEBUG_ALL
+
+#ifdef ARDUINO_AVR_PROTRINKET3FTDI
+#include <SoftwareSerial.h>
 static SoftwareSerial* sPortDebug;
-extern SoftwareSerial sw;
+extern SoftwareSerial* sw;
+#elif defined(ARDUINO_STM_NUCLEO_F103RB)
+static HardwareSerial* sPortDebug;
+extern HardwareSerial* sw;
+#endif
+
+static HardwareSerial* sPort;
 const byte BUFFSIZE=250;
 static char rxbuf[BUFFSIZE];
-static byte index=0;
+static byte indexRxBuf=0;
 
-#ifdef __cplusplus
-extern "C"{
-#endif
-void UART_Wr_Ptr(unsigned char _data)
+void UART_Wr_Ptr(char _data)
 {
     sPort->write(_data);
 #if DEBUG_LEVEL >= DEBUG_ALL
@@ -19,19 +25,22 @@ void UART_Wr_Ptr(unsigned char _data)
 #endif
 }
 
-void UART_Write_Text(unsigned char *_data)
+void UART_Write_Text(const char *_data)
 {
-    sPort->print((const char*)_data);
+    sPort->print(_data);
 #if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->print("TX: ");
-    sPortDebug->println((const char*)_data);
+    if(!strlen(_data))
+    {
+        sPortDebug->print("Empty tx msg");
+    }else
+    {
+        sPortDebug->print("TX: ");
+        sPortDebug->println(_data);
+    }
 #endif
 }
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
-rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive):
+rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr):
     _pinWake_sw_7(pinWake_sw),
     _pinWake_hw_15(pinWake_hw),
     _pinEnPwr(pinEnPwr),
@@ -40,7 +49,7 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPw
     _characteristicCount(0)
 {
     sPort=&s;
-    sPortDebug=&sw;
+    sPortDebug=sw;
     memset(_lastCreatedService,'\0',sizeof(_lastCreatedService));
     ble2_hal_init();
 }
@@ -81,7 +90,7 @@ void rn4020::loop()
     {
         return;
     }
-    index=0;
+    indexRxBuf=0;
     if(strstr(rxbuf, "Connected") && _ftConnection)
     {
         _ftConnection(true);
@@ -329,7 +338,7 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
     if(bStartNotStop)
     {
         //Start
-        ble2_start_advertisment(interval_ms,0);
+        ble2_start_advertisement(interval_ms,0);
     }else
     {
         //Stop
@@ -378,7 +387,6 @@ bool rn4020::getHandle(btCharacteristic* pbt)
     {
         return false;
     }
-
     pch = strtok (rxbuf,"\r\n");
     do
     {
@@ -468,7 +476,7 @@ bool rn4020::isModuleActive(unsigned long uiTimeout)
 bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
 {
     rxbuf[0]='\0';
-    index=0;
+    indexRxBuf=0;
     if(!pattern || !strlen(pattern))
     {
 #if DEBUG_LEVEL >= DEBUG_ALL
@@ -480,7 +488,7 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     do{
         gotLine();
     }while(millis()<ulStartTime+uiTimeout && (!strstr(rxbuf, pattern)));
-    index=0;
+    indexRxBuf=0;
 #if DEBUG_LEVEL >= DEBUG_ALL
     //    sPortDebug->print("Pattern: ");
     //    sPortDebug->println(pattern);
@@ -516,11 +524,11 @@ bool rn4020::gotLine()
     char c=sPort->read();
     if(c!='\xFF' && c!='\0')
     {
-        rxbuf[index]=c;
-        rxbuf[++index]='\0';
-        if(index==BUFFSIZE-1)
+        rxbuf[indexRxBuf]=c;
+        rxbuf[++indexRxBuf]='\0';
+        if(indexRxBuf==BUFFSIZE-1)
         {
-            index=0;
+            indexRxBuf=0;
         }
     }
     return strstr(rxbuf,"\r\n");

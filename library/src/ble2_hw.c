@@ -265,7 +265,7 @@ void ble2_trigger_echo()
     ble2_hal_send("+");
 }
 
-void ble2_start_advertisment (uint16_t interval, uint16_t window_time)
+void ble2_start_advertisement(uint16_t interval, uint16_t window_time)
 {
     char tmp[25] = {0};
     char tmp2[5] = {0};

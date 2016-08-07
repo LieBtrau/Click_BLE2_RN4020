@@ -1,8 +1,16 @@
 #ifndef RN4020_H
 #define RN4020_H
 #include "Arduino.h"
-#include <SoftwareSerial.h>
 #include "btcharacteristic.h"
+
+#ifdef __cplusplus
+extern "C"{
+#endif
+void UART_Wr_Ptr(char _data);
+void UART_Write_Text(const char *_data);
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 class rn4020
 {
@@ -17,7 +25,7 @@ public:
         DEEP_SLEEP,
         DORMANT
     }OPERATING_MODES;
-    rn4020(HardwareSerial &s, byte pinWake_sw, byte pinWake_hw, byte pinEnPwr, byte pinBtActive);
+    rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
     bool begin(unsigned long baudrate);
     void loop();
     bool doFactoryDefault();

@@ -286,7 +286,7 @@ void ble2_trigger_echo();
  * @param window_time
  * Total advertisment window in miliseconds
  */
-void ble2_start_advertisment(uint16_t interval, uint16_t window_time);
+void ble2_start_advertisement(uint16_t interval, uint16_t window_time);
 /**
  * @brief
  * Secures the connection and bond two connected devices.

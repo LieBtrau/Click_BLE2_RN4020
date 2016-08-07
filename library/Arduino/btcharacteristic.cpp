@@ -1,5 +1,4 @@
 #include "btcharacteristic.h"
-#include <SoftwareSerial.h>
 #include <ctype.h>
 
 btCharacteristic::btCharacteristic(const char* uuid_service, const char* uuid_characteristic,
