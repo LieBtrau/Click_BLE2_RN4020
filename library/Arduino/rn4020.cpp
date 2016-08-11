@@ -293,7 +293,7 @@ bool rn4020::doReboot(unsigned long baudrate)
 
 bool rn4020::addCharacteristic(btCharacteristic* bt)
 {
-    if(bt->getHandle() || (getHandle(bt) && bt->getHandle()))
+    if(bt->getHandle())
     {
         //handle already exists
         return true;
@@ -319,17 +319,14 @@ bool rn4020::addCharacteristic(btCharacteristic* bt)
     {
         return false;
     }
-    //Get handle of the created characteristic, so the callback functionality can work
-    if(!getHandle(bt))
-    {
-        return false;
-    }
     _characteristicList = (btCharacteristic**) realloc(_characteristicList, (_characteristicCount + 1) * sizeof(btCharacteristic*));
     if(!_characteristicList)
     {
         return false;
     }
     _characteristicList[_characteristicCount++]=bt;
+    //Get the handle of the characteristic
+    updateHandles();
     return true;
 }
 
@@ -376,75 +373,66 @@ bool rn4020::waitForStartup(unsigned long baudrate)
     return waitForReply(2000,"CMD");
 }
 
-
-bool rn4020::getHandle(btCharacteristic* pbt)
+/* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
+ * change.  This function updates those handles.
+ */
+void rn4020::updateHandles()
 {
     char* pch;
     byte state=0;
+    byte ctr=0;
 
+    //Get list of services
     ble2_list_server_services();
     if(!waitForReply(2000, "END\r\n"))
     {
-        return false;
+        return;
     }
+    //Parse response line by line
     pch = strtok (rxbuf,"\r\n");
     do
     {
-        //#if DEBUG_LEVEL >= DEBUG_ALL
-        //        sPortDebug->println(pch);
-        //#endif
         switch(state)
         {
         case 0:
-            //Nothing found yet, split string in lines;
-            if(strstr(pch,pbt->getUuidService()))
+            //Check if the line contains a service
+            for(ctr=0;ctr<_characteristicCount;ctr++)
             {
-                state=1;
-#if DEBUG_LEVEL >= DEBUG_ALL
-                sPortDebug->println("Service found");
-#endif
-            }
-            pch = strtok (NULL, "\r\n");
-            break;
-        case 1:
-            //Service found, now looking for line with characteristic
-            if(strncmp(pch,"  ",2))
-            {
-#if DEBUG_LEVEL >= DEBUG_ALL
-                sPortDebug->println("Characteristic not found in service");
-#endif
-                return false;
-            }
-            if(strstr(pch, pbt->getUuidCharacteristic()))
-            {
-                state=2;
-            }
-            else
-            {
-                //get next characteristic in this service
-                pch = strtok (NULL, "\r\n");
-            }
-            break;
-        case 2:
-            //Characteristic found, now looking for handle
-            pch=strtok(pch,",");
-            pch=strtok(NULL,",");
-            if(pch)
-            {
-                word handle;
-                if(sscanf(pch, "%x", &handle)==1)
+                //Nothing found yet, split string in lines;
+                if(strstr(pch,_characteristicList[ctr]->getUuidService()))
                 {
-#if DEBUG_LEVEL >= DEBUG_ALL
-                    sPortDebug->println("Setting handle");
-                    sPortDebug->println(handle, HEX);
-#endif
-                    pbt->setHandle(handle);
-                    return true;
+                    //Service found, now looking for line with characteristic
+                    state=1;
+                    break;
                 }
             }
+            break;
+        case 1:
+            if(strncmp(pch,"  ",2))
+            {
+                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
+                return;
+            }
+            if(strstr(pch, _characteristicList[ctr]->getUuidCharacteristic()))
+            {
+                //Characteristic found, now looking for handle
+                char* pch2=strchr(pch,',')+1;
+                word handle;
+                if(sscanf(pch2, "%x,", &handle)==1)
+                {
+//#if DEBUG_LEVEL >= DEBUG_ALL
+//                    sPortDebug->println("Setting handle");
+//                    sPortDebug->println(handle, HEX);
+//#endif
+                    _characteristicList[ctr]->setHandle(handle);
+
+                }
+                state=0;
+                break;
+            }
         }
+        pch = strtok (NULL, "\r\n");
     }while (pch != NULL);
-    return false;
 }
 
 bool rn4020::isModuleActive(unsigned long uiTimeout)

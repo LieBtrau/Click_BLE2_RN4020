@@ -44,7 +44,7 @@ private:
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
     bool isModuleActive(unsigned long uiTimeout);
     bool waitForStartup(unsigned long baudrate);
-    bool getHandle(btCharacteristic* pbt);
+    void updateHandles();
     void cyclePower(OPERATING_MODES om);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12

@@ -74,7 +74,7 @@ void ble2_hal_init()
 
 void ble2_hal_send( const char *data_in )
 {
-    char* buf=malloc(strlen(data_in)+1);
+    char* buf=malloc(strlen(data_in)+2);
     if(buf)
     {
         strcpy(buf, data_in);
