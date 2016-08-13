@@ -86,6 +86,9 @@ void rn4020::setConnectionListener(void (*ftConnection)(bool))
 void rn4020::loop()
 {
     bool bEventHandled=false;
+    word handle;
+    byte length;
+    char value[42];
     if(!gotLine())
     {
         return;
@@ -101,37 +104,18 @@ void rn4020::loop()
         _ftConnection(false);
         bEventHandled=true;
     }
-    if(!strncmp(rxbuf, "WV,",3))
+    if(sscanf(rxbuf, "WV,%04x,%s ", &handle,value)==2)
     {
-        //Local server characteristic has been written by remote client
-        char* pch= strtok(rxbuf,",");
-        if(!pch)
-        {
-            return;
-        }
-        pch= strtok(NULL, ",");
-        if(!pch)
-        {
-            return;
-        }
-        //Get the handle of the changed characteristic
-        word handle;
-        if(sscanf(pch, "%x", &handle)!=1)
-        {
-            return;
-        }
         //look up the matching characteristic in our local list
         for(byte i=0;i<_characteristicCount;i++)
         {
             if(_characteristicList[i]->getHandle()==handle)
             {
-                pch= strtok(NULL, ",");
-                if(!pch)
-                {
-                    return;
-                }
+                //Local server characteristic has been written by remote client
+                length=_characteristicList[i]->getValueLength();
+                hex2array(value,length);
                 //Call the event handler attached to this characteristic
-                _characteristicList[i]->callListener(pch);
+                _characteristicList[i]->callListener(value, length);
             }
         }
         bEventHandled=true;
@@ -520,4 +504,15 @@ bool rn4020::gotLine()
         }
     }
     return strstr(rxbuf,"\r\n");
+}
+
+void rn4020::hex2array(char* hexstring, byte& length)
+{
+    byte hexlength=strlen(hexstring)>>1;
+    length=hexlength>length ? length : hexlength;
+    for(byte i=0;i<length;i++)
+    {
+        sscanf(hexstring+(i<<1),"%2x", hexstring+i);
+    }
+    hexstring[length]='\0';
 }

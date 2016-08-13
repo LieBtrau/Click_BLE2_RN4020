@@ -46,6 +46,7 @@ private:
     bool waitForStartup(unsigned long baudrate);
     void updateHandles();
     void cyclePower(OPERATING_MODES om);
+    void hex2array(char* hexstring, byte& length);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
