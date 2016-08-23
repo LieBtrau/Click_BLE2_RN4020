@@ -113,7 +113,7 @@ void rn4020::loop()
             {
                 //Local server characteristic has been written by remote client
                 length=_characteristicList[i]->getValueLength();
-                hex2array(value,length);
+                hex2array(value, (byte*)value, length);
                 //Call the event handler attached to this characteristic
                 _characteristicList[i]->callListener(value, length);
             }
@@ -157,6 +157,35 @@ bool rn4020::setTxPower(byte pwr)
     }
     ble2_set_transmission_power((tx_pwr_t)pwr);
     return waitForReply(2000,"AOK");
+}
+
+bool rn4020::getMacAddress(byte* array, byte& length)
+{
+    if(!array)
+    {
+        return false;
+    }
+    char hexarray[12];
+    memset(rxbuf,'\0', BUFFSIZE);
+    //MAC address contains 6 bytes
+    ble2_display_critical_info();
+    unsigned long ulStartTime=millis();
+    while(millis()<ulStartTime+2000 && countChars(rxbuf,'\n')<8)
+    {
+        gotLine();
+    }
+    //Parse response line by line
+    char* pch = strtok (rxbuf,"\r\n");
+    while (pch != NULL)
+    {
+        if(sscanf(pch, "BTA=%12s", hexarray)==1)
+        {
+            length=6;
+            hex2array(hexarray, array, length);
+            return true;
+        }
+        pch = strtok (NULL, "\r\n");
+    }
 }
 
 bool rn4020::removePrivateCharacteristics()
@@ -404,10 +433,10 @@ void rn4020::updateHandles()
                 word handle;
                 if(sscanf(pch2, "%x,", &handle)==1)
                 {
-//#if DEBUG_LEVEL >= DEBUG_ALL
-//                    sPortDebug->println("Setting handle");
-//                    sPortDebug->println(handle, HEX);
-//#endif
+                    //#if DEBUG_LEVEL >= DEBUG_ALL
+                    //                    sPortDebug->println("Setting handle");
+                    //                    sPortDebug->println(handle, HEX);
+                    //#endif
                     _characteristicList[ctr]->setHandle(handle);
 
                 }
@@ -506,13 +535,30 @@ bool rn4020::gotLine()
     return strstr(rxbuf,"\r\n");
 }
 
-void rn4020::hex2array(char* hexstring, byte& length)
+void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
 {
-    byte hexlength=strlen(hexstring)>>1;
-    length=hexlength>length ? length : hexlength;
-    for(byte i=0;i<length;i++)
+    if((!arrayOut) || (!hexstringIn))
     {
-        sscanf(hexstring+(i<<1),"%2x", hexstring+i);
+        return;
     }
-    hexstring[length]='\0';
+    lengthOut=strlen(hexstringIn)>>1;
+    for(byte i=0;i<lengthOut;i++)
+    {
+        sscanf(hexstringIn+(i<<1),"%2x", arrayOut+i);
+    }
+}
+
+word rn4020::countChars(char* buf, char findc)
+{
+    char* pch=buf;
+    word ctr=0;
+    while(*pch)
+    {
+        if(*pch==findc)
+        {
+            ctr++;
+        }
+        pch++;
+    }
+    return ctr;
 }

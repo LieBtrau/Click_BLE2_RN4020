@@ -32,6 +32,7 @@ public:
     bool doReboot(unsigned long baudrate);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool dummy(void(*function)());
+    bool getMacAddress(byte* array, byte& length);
     bool setRole(ROLES rl);
     bool setTxPower(byte pwr);
     bool setBaudrate(unsigned long baud);
@@ -46,7 +47,8 @@ private:
     bool waitForStartup(unsigned long baudrate);
     void updateHandles();
     void cyclePower(OPERATING_MODES om);
-    void hex2array(char* hexstring, byte& length);
+    void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
+    word countChars(char* buf, char findc);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
