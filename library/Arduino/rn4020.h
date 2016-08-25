@@ -33,6 +33,8 @@ public:
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool dummy(void(*function)());
     bool getMacAddress(byte* array, byte& length);
+    bool getBluetoothDeviceName(char* btName);
+    bool setBluetoothDeviceName(const char* btName);
     bool setRole(ROLES rl);
     bool setTxPower(byte pwr);
     bool setBaudrate(unsigned long baud);
@@ -41,6 +43,7 @@ public:
     bool addCharacteristic(btCharacteristic* bt);
     bool removePrivateCharacteristics();
 private:
+    bool waitForLines(unsigned long ulTimeout, byte nrOfEols);
     bool gotLine();
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
     bool isModuleActive(unsigned long uiTimeout);

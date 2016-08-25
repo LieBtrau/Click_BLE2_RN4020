@@ -34,7 +34,7 @@ void UART_Write_Text(const char *_data)
         sPortDebug->print("Empty tx msg");
     }else
     {
-        sPortDebug->print("TX: ");
+        sPortDebug->print("\r\nTX: ");
         sPortDebug->println(_data);
     }
 #endif
@@ -166,13 +166,10 @@ bool rn4020::getMacAddress(byte* array, byte& length)
         return false;
     }
     char hexarray[12];
-    memset(rxbuf,'\0', BUFFSIZE);
-    //MAC address contains 6 bytes
     ble2_display_critical_info();
-    unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+2000 && countChars(rxbuf,'\n')<8)
+    if(!waitForLines(2000, 8))
     {
-        gotLine();
+        return false;
     }
     //Parse response line by line
     char* pch = strtok (rxbuf,"\r\n");
@@ -180,6 +177,7 @@ bool rn4020::getMacAddress(byte* array, byte& length)
     {
         if(sscanf(pch, "BTA=%12s", hexarray)==1)
         {
+            //MAC address contains 6 bytes
             length=6;
             hex2array(hexarray, array, length);
             return true;
@@ -192,6 +190,36 @@ bool rn4020::removePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
     return waitForReply(2000,"AOK");
+}
+
+bool rn4020::setBluetoothDeviceName(const char* btName)
+{
+    ble2_set_device_bluetooth_name(btName);
+    return waitForReply(2000,"AOK");
+}
+
+bool rn4020::getBluetoothDeviceName(char* btName)
+{
+    if(!btName)
+    {
+        return false;
+    }
+    ble2_display_critical_info();
+    if(!waitForLines(2000, 8))
+    {
+        return false;
+    }
+    //Parse response line by line
+    char* pch = strtok (rxbuf,"\r\n");
+    while (pch != NULL)
+    {
+        if(sscanf(pch, "Name=%20s", btName)==1)
+        {
+            return true;
+        }
+        pch = strtok (NULL, "\r\n");
+    }
+    return false;
 }
 
 bool rn4020::setBaudrate(unsigned long baud)
@@ -490,30 +518,17 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
         gotLine();
     }while(millis()<ulStartTime+uiTimeout && (!strstr(rxbuf, pattern)));
     indexRxBuf=0;
-#if DEBUG_LEVEL >= DEBUG_ALL
-    //    sPortDebug->print("Pattern: ");
-    //    sPortDebug->println(pattern);
-    //    sPortDebug->println((unsigned long)strstr(rxbuf, pattern), DEC);
-    char* pch=rxbuf;
-    char b=0,c=0;
-    sPortDebug->print("RX: ");
-    while(*pch)
-    {
-        if(*pch>27)
-        {
-            sPortDebug->print(*pch);
-        }
-        b=c;
-        c=*pch;
-        if(b=='\r' && c=='\n')
-        {
-            sPortDebug->print("\r\nRX: ");
-        }
-        pch++;
-    }
-    sPortDebug->println();
-#endif
     return strstr(rxbuf, pattern);
+}
+
+bool rn4020::waitForLines(unsigned long ulTimeout, byte nrOfEols)
+{
+    unsigned long ulStartTime=millis();
+    while(millis()<ulStartTime+ulTimeout && countChars(rxbuf,'\n')<nrOfEols)
+    {
+        gotLine();
+    }
+    return countChars(rxbuf,'\n');
 }
 
 bool rn4020::gotLine()
@@ -532,6 +547,23 @@ bool rn4020::gotLine()
             indexRxBuf=0;
         }
     }
+#if DEBUG_LEVEL >= DEBUG_ALL
+    static char b=0,d=0;
+    if(b==0 && d==0)
+    {
+        sPortDebug->print("\r\nRX: ");
+    }
+    if(c>27)
+    {
+        sPortDebug->print(c);
+    }
+    b=d;
+    d=c;
+    if(b=='\r' && d=='\n')
+    {
+        sPortDebug->print("\r\nRX: ");
+    }
+#endif
     return strstr(rxbuf,"\r\n");
 }
 

@@ -48,12 +48,11 @@
 
 //***** function implementations ***** //
 
-void ble2_set_device_bluetooth_name (char* device_name)
+void ble2_set_device_bluetooth_name (const char* device_name)
 {
     char tmp[16] = {0};
-    char *tmp_device_name = device_name;
     strcpy ( tmp, "S-," );
-    strcat ( tmp, tmp_device_name );
+    strcat ( tmp, device_name );
     ble2_hal_send(tmp);
 }
 

@@ -152,7 +152,8 @@ extern "C"{
  * @param device_name
  * Desired bluetooth name
  */
-void ble2_set_device_bluetooth_name (char* device_name);
+void ble2_set_device_bluetooth_name (const char* device_name);
+
 /**
  * @brief
  * Sets the baud rate of the UART communication
