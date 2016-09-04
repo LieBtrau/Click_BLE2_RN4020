@@ -17,32 +17,34 @@ class rn4020
 public:
     typedef enum
     {
-        PERIPHERAL
+        RL_PERIPHERAL,
+        RL_CENTRAL
     }ROLES;
     typedef enum
     {
-        NORMAL,
-        DEEP_SLEEP,
-        DORMANT
+        OM_NORMAL,
+        OM_DEEP_SLEEP,
+        OM_DORMANT
     }OPERATING_MODES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
-    bool begin(unsigned long baudrate);
+    bool begin(unsigned long baudrate, ROLES role);
     void loop();
-    bool doFactoryDefault();
     bool doReboot(unsigned long baudrate);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
-    bool dummy(void(*function)());
     bool getMacAddress(byte* array, byte& length);
     bool getBluetoothDeviceName(char* btName);
     bool setBluetoothDeviceName(const char* btName);
-    bool setRole(ROLES rl);
     bool setTxPower(byte pwr);
-    bool setBaudrate(unsigned long baud);
     bool setOperatingMode(OPERATING_MODES om);
+    void setBondingPasscode(const char* passcode);
     void setConnectionListener(void (*ftConnection)(bool));
+    void setBondingListener(void (*ftBonding)(void));
     bool addCharacteristic(btCharacteristic* bt);
     bool removePrivateCharacteristics();
+    bool doFindRemoteDevices(bool bEnabled);
 private:
+    bool doFactoryDefault();
+    bool setBaudrate(unsigned long baud);
     bool waitForLines(unsigned long ulTimeout, byte nrOfEols);
     bool gotLine();
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
@@ -56,10 +58,12 @@ private:
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
     byte _pinEnPwr;
-    void (*_ftConnection)(bool bUp);
+    void (*_ftConnectionStateChanged)(bool bUp);
+    void (*_ftBondingRequested)(void);
     btCharacteristic** _characteristicList;
     byte _characteristicCount;
     char _lastCreatedService[40];
+    ROLES _role;
 };
 
 #endif // RN4020_H

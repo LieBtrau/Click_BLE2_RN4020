@@ -45,7 +45,7 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _pinWake_hw_15(pinWake_hw),
     _pinEnPwr(pinEnPwr),
     _pinActive_12(pinBtActive),
-    _ftConnection(0),
+    _ftConnectionStateChanged(0),
     _characteristicCount(0)
 {
     sPort=&s;
@@ -54,14 +54,57 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     ble2_hal_init();
 }
 
-bool rn4020::begin(unsigned long baudrate)
+bool rn4020::begin(unsigned long baudrate, ROLES role)
 {
     pinMode(_pinEnPwr, OUTPUT);
     pinMode(_pinWake_hw_15, OUTPUT);
     pinMode(_pinWake_sw_7, OUTPUT);
     pinMode(_pinActive_12, INPUT);
-    cyclePower(NORMAL);
-    return waitForStartup(baudrate);
+    //Establish UART communication with module
+    cyclePower(OM_NORMAL);
+    if(!waitForStartup(baudrate))
+    {
+        //Maybe the module is blocked or set to an unknown baudrate?
+        if(!doFactoryDefault())
+        {
+            return false;
+        }
+        if(!setBaudrate(2400))
+        {
+            return false;
+        }
+        //Baudrate only becomes active after resetting the module.
+        if(!doReboot(2400))
+        {
+            return false;
+        }
+    }
+    //Set module parameters
+    switch(role)
+    {
+    case RL_PERIPHERAL:
+        //Services: Device Information + Battery Level + user defined private services enabled
+        ble2_set_server_services(0xC0000001);
+        if(!waitForReply(2000,"AOK"))
+        {
+            return false;
+        }
+        //Enable authentication with Keyboard and display as IO-capabilities + server only
+        ble2_set_supported_features(0x00482000);
+        break;
+    case RL_CENTRAL:
+        //Services: Device Information + Battery Level services enabled
+        ble2_set_server_services(0xC0000000);
+        if(!waitForReply(2000,"AOK"))
+        {
+            return false;
+        }
+        ble2_set_supported_features(0x80000000);
+        break;
+    default:
+        return false;
+    }
+    return waitForReply(2000,"AOK");
 }
 
 void rn4020::cyclePower(OPERATING_MODES om)
@@ -71,7 +114,7 @@ void rn4020::cyclePower(OPERATING_MODES om)
     digitalWrite(_pinEnPwr, HIGH);//module OFF
     delay(100);
     digitalWrite(_pinEnPwr, LOW);//module ON
-    if(om==NORMAL)
+    if(om==OM_NORMAL)
     {
         digitalWrite(_pinWake_sw_7, HIGH);
     }
@@ -79,9 +122,13 @@ void rn4020::cyclePower(OPERATING_MODES om)
 
 void rn4020::setConnectionListener(void (*ftConnection)(bool))
 {
-    _ftConnection=ftConnection;
+    _ftConnectionStateChanged=ftConnection;
 }
 
+void rn4020::setBondingListener(void (*ftBonding)(void))
+{
+    _ftBondingRequested=ftBonding;
+}
 
 void rn4020::loop()
 {
@@ -89,19 +136,28 @@ void rn4020::loop()
     word handle;
     byte length;
     char value[42];
-    if(!gotLine())
+    if(!strncmp(rxbuf, "Passcode:", 9) && _ftBondingRequested)
     {
-        return;
+        _ftBondingRequested();
+        bEventHandled=true;
+        *rxbuf='\0';    //avoid future calls
+    }else
+    {
+        if(!gotLine())
+        {
+            return;
+        }
+
     }
     indexRxBuf=0;
-    if(strstr(rxbuf, "Connected") && _ftConnection)
+    if(strstr(rxbuf, "Connected") && _ftConnectionStateChanged)
     {
-        _ftConnection(true);
+        _ftConnectionStateChanged(true);
         bEventHandled=true;
     }
-    if(strstr(rxbuf, "Connection End") && _ftConnection)
+    if(strstr(rxbuf, "Connection End") && _ftConnectionStateChanged)
     {
-        _ftConnection(false);
+        _ftConnectionStateChanged(false);
         bEventHandled=true;
     }
     if(sscanf(rxbuf, "WV,%04x,%s ", &handle,value)==2)
@@ -127,25 +183,6 @@ void rn4020::loop()
         sPortDebug->print("Unknown input: ");
         sPortDebug->println(rxbuf);
 #endif
-    }
-}
-
-bool rn4020::setRole(rn4020::ROLES rl)
-{
-    switch(rl)
-    {
-    case PERIPHERAL:
-        //Services: Device Information + Battery Level
-        ble2_set_server_services(0xC0000001);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-        //Enable authentication with Keyboard and display as IO-capabilities
-        ble2_set_supported_features(0x00480000);
-        return waitForReply(2000,"AOK");
-    default:
-        return false;
     }
 }
 
@@ -259,19 +296,25 @@ bool rn4020::setBaudrate(unsigned long baud)
     return waitForReply(2000,"AOK");
 }
 
+void rn4020::setBondingPasscode(const char* passcode)
+{
+    ble2_set_passcode(passcode);
+}
+
+
 //http://microchip.wikidot.com/ble:rn4020-power-states
 bool rn4020::setOperatingMode(OPERATING_MODES om)
 {
     bool bSuccess=false;
     bool bInNormalMode=false;
     switch (om) {
-    case NORMAL:
+    case OM_NORMAL:
         digitalWrite(_pinWake_sw_7, HIGH);
         digitalWrite(_pinWake_hw_15, HIGH);
         bSuccess=isModuleActive(2000);
         digitalWrite(_pinWake_hw_15, LOW);
         return bSuccess;
-    case DEEP_SLEEP:
+    case OM_DEEP_SLEEP:
         bInNormalMode=isModuleActive(2000);
         digitalWrite(_pinWake_sw_7, LOW);
         if(bInNormalMode)
@@ -282,7 +325,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         delay(10);
         digitalWrite(_pinWake_hw_15, LOW);
         return (!bInNormalMode) || bSuccess;
-    case DORMANT:
+    case OM_DORMANT:
         digitalWrite(_pinWake_sw_7, HIGH);
         bInNormalMode=isModuleActive(2000);
         ble2_dormant_mode_enable();
@@ -302,7 +345,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
  */
 bool rn4020::doFactoryDefault()
 {
-    setOperatingMode(NORMAL);
+    setOperatingMode(OM_NORMAL);
     delay(200);
 #if DEBUG_LEVEL >= DEBUG_ALL
     sPortDebug->println("Forcing factory default.");
@@ -317,15 +360,14 @@ bool rn4020::doFactoryDefault()
     //Give module time to reset.
     //It won't send any data to signal a succeeded factory reset.  Pin 12 will remain high
     delay(1500);
-    return true;
+    //Force reboot.  It allows us to check if the module communication is OK again.
+    cyclePower(OM_NORMAL);
+    //Factory default baud=115200
+    return waitForStartup(115200);
 }
 
 bool rn4020::doReboot(unsigned long baudrate)
 {
-    pinMode(A0, OUTPUT);
-    digitalWrite(A0, HIGH);
-    delay(1);
-    digitalWrite(A0, LOW);
     ble2_device_reboot();
     //ProTrinket 3V gets framing errors when trying to receive the "Reboot" at 115200baud.
     //waitForReply(2000,"Reboot");
@@ -371,6 +413,20 @@ bool rn4020::addCharacteristic(btCharacteristic* bt)
     return true;
 }
 
+bool rn4020::doFindRemoteDevices(bool bEnabled)
+{
+    if(bEnabled)
+    {
+        ble2_query_peripheral_devices(0,0);
+    }
+    else
+    {
+        ble2_stop_inquiry_process();
+    }
+    return waitForReply(2000,"AOK\r\n");
+}
+
+
 bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
 {
     if(bStartNotStop)
@@ -385,21 +441,6 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
     return waitForReply(2000,"AOK");
 }
 
-bool rn4020::dummy(void (*function)())
-{
-    //    char handle[10];
-    //    if(!getHandle("1802","2A06", handle))
-    //    {
-    //#if DEBUG_LEVEL >= DEBUG_ALL
-    //        sPortDebug->println("GetHandle Failed!!");
-    //#endif
-    //    }else
-    //    {
-    //#if DEBUG_LEVEL >= DEBUG_ALL
-    //        sPortDebug->println((char*)handle);
-    //#endif
-    //    }
-}
 
 bool rn4020::waitForStartup(unsigned long baudrate)
 {
@@ -544,6 +585,7 @@ bool rn4020::gotLine()
         rxbuf[++indexRxBuf]='\0';
         if(indexRxBuf==BUFFSIZE-1)
         {
+            //Reset buffer when there's an overflow
             indexRxBuf=0;
         }
     }

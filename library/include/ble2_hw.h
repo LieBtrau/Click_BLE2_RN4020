@@ -298,6 +298,7 @@ void ble2_start_advertisement(uint16_t interval, uint16_t window_time);
  * the peer device is not saved into NVM. In this situation, the connection is not bonded.
  */
 void ble2_bond(bond_saving_t parameter);
+void ble2_set_passcode(const char* passcode);
 /**
  * @brief
  * Displays critical information about the current device over the UART.

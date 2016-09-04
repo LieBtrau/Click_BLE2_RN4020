@@ -289,6 +289,11 @@ void ble2_bond(bond_saving_t parameter)
     ble2_hal_send(tmp);
 }
 
+void ble2_set_passcode(const char* passcode)
+{
+    ble2_hal_send(passcode);
+}
+
 void ble2_display_critical_info()
 {
     ble2_hal_send("D");
@@ -318,13 +323,14 @@ void ble2_query_peripheral_devices(uint16_t scan_interval, uint16_t scan_window)
     char tmp[33] = {0};
     char tmp2[10] = {0};
 
-    strcpy(tmp, "F,");
-    sprintf(tmp2,"%04X",scan_interval);
-    strcat(tmp,tmp2);
-    strcat(tmp,",");
-    sprintf(tmp2,"%04X",scan_window);
-    strcat(tmp,tmp2);
-
+    strcpy(tmp, "F");
+    if(scan_interval)
+    {
+        sprintf(tmp2,",%04X",scan_interval);
+        strcat(tmp,tmp2);
+        sprintf(tmp2,",%04X",scan_window);
+        strcat(tmp,tmp2);
+    }
     ble2_hal_send(tmp);
 }
 
