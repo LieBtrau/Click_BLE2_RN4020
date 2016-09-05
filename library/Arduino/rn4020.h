@@ -26,6 +26,12 @@ public:
         OM_DEEP_SLEEP,
         OM_DORMANT
     }OPERATING_MODES;
+    typedef struct
+    {
+        char btAddress[13];
+        char privCharacteristic[33];
+        char rssi;
+    }ADVERTISEMENT;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
     bool begin(unsigned long baudrate, ROLES role);
     void loop();
@@ -39,6 +45,7 @@ public:
     void setBondingPasscode(const char* passcode);
     void setConnectionListener(void (*ftConnection)(bool));
     void setBondingListener(void (*ftBonding)(void));
+    void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool addCharacteristic(btCharacteristic* bt);
     bool removePrivateCharacteristics();
     bool doFindRemoteDevices(bool bEnabled);
@@ -52,6 +59,7 @@ private:
     bool waitForStartup(unsigned long baudrate);
     void updateHandles();
     void cyclePower(OPERATING_MODES om);
+    bool parseAdvertisement(char* buffer);
     void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
     word countChars(char* buf, char findc);
     byte _pinWake_sw_7; //RN4020 pin 7
@@ -60,6 +68,7 @@ private:
     byte _pinEnPwr;
     void (*_ftConnectionStateChanged)(bool bUp);
     void (*_ftBondingRequested)(void);
+    void (*_ftAdvertisementReceived)(ADVERTISEMENT* adv);
     btCharacteristic** _characteristicList;
     byte _characteristicCount;
     char _lastCreatedService[40];

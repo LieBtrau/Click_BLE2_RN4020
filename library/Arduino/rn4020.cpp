@@ -130,6 +130,12 @@ void rn4020::setBondingListener(void (*ftBonding)(void))
     _ftBondingRequested=ftBonding;
 }
 
+void rn4020::setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*))
+{
+    _ftAdvertisementReceived=ftAdvertisementReceived;
+}
+
+
 void rn4020::loop()
 {
     bool bEventHandled=false;
@@ -160,7 +166,7 @@ void rn4020::loop()
         _ftConnectionStateChanged(false);
         bEventHandled=true;
     }
-    if(sscanf(rxbuf, "WV,%04x,%s ", &handle,value)==2)
+    if(sscanf(rxbuf, "WV,%04x,%32s ", &handle,value)==2)
     {
         //look up the matching characteristic in our local list
         for(byte i=0;i<_characteristicCount;i++)
@@ -176,6 +182,10 @@ void rn4020::loop()
         }
         bEventHandled=true;
     }
+    if(parseAdvertisement(rxbuf))
+    {
+        bEventHandled=true;
+    }
     if(!bEventHandled)
     {
         //If no matching string found
@@ -184,6 +194,40 @@ void rn4020::loop()
         sPortDebug->println(rxbuf);
 #endif
     }
+}
+
+bool rn4020::parseAdvertisement(char* buffer)
+{
+    byte i=0;
+    char* advertisement=(char*)malloc(strlen(buffer));
+    strcpy(advertisement, buffer);
+    char* pch = strtok (advertisement,",");
+    ADVERTISEMENT adv;
+
+    for(i=0;i<4 && pch != NULL;i++)
+    {
+        switch(i)
+        {
+        case 0:
+            strcpy(adv.btAddress,pch);
+        case 1:
+            break;
+        case 2:
+            strcpy(adv.privCharacteristic, pch);
+            break;
+        case 3:
+            adv.rssi=atoi(pch);
+            break;
+        }
+        pch = strtok (NULL, ",");
+    }
+    free(advertisement);
+    if(i!=4 || (!_ftAdvertisementReceived))
+    {
+        return false;
+    }
+    _ftAdvertisementReceived(&adv);
+    return true;
 }
 
 bool rn4020::setTxPower(byte pwr)
