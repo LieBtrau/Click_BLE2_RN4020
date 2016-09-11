@@ -299,13 +299,13 @@ void ble2_display_critical_info()
     ble2_hal_send("D");
 }
 
-int8_t ble2_start_connection(mac_address_t mac_address_type, char* mac_address )
+int8_t ble2_start_connection(mac_address_t mac_address_type, const char* mac_address )
 {
     char tmp[20] = {0};
 
     if (mac_address_type > 1)
         return -1;
-    if (strlen (mac_address) > 6)
+    if (strlen (mac_address) > 12)
         return -1;
 
     strcpy(tmp, "E,");

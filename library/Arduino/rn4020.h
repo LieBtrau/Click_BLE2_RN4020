@@ -17,6 +17,7 @@ class rn4020
 public:
     typedef enum
     {
+        RL_UNDEFINED,
         RL_PERIPHERAL,
         RL_CENTRAL
     }ROLES;
@@ -33,35 +34,38 @@ public:
         char rssi;
     }ADVERTISEMENT;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
+    bool addCharacteristic(btCharacteristic* bt);
     bool begin(unsigned long baudrate, ROLES role);
-    void loop();
-    bool doReboot(unsigned long baudrate);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
-    bool getMacAddress(byte* array, byte& length);
+    bool doConnecting(const char* remoteBtAddress);
+    bool doFindRemoteDevices(bool bEnabled);
+    bool doReboot(unsigned long baudrate);
     bool getBluetoothDeviceName(char* btName);
+    bool getMacAddress(byte* array, byte& length);
+    void loop();
+    bool removePrivateCharacteristics();
+    void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool setBluetoothDeviceName(const char* btName);
-    bool setTxPower(byte pwr);
-    bool setOperatingMode(OPERATING_MODES om);
+    void setBondingListener(void (*ftBonding)(void));
+    void setBondingPasscodeListener(void (*ftPasscode)(unsigned long));
     void setBondingPasscode(const char* passcode);
     void setConnectionListener(void (*ftConnection)(bool));
-    void setBondingListener(void (*ftBonding)(void));
-    void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
-    bool addCharacteristic(btCharacteristic* bt);
-    bool removePrivateCharacteristics();
-    bool doFindRemoteDevices(bool bEnabled);
+    bool setOperatingMode(OPERATING_MODES om);
+    bool setTxPower(byte pwr);
+    bool startBonding();
 private:
-    bool doFactoryDefault();
-    bool setBaudrate(unsigned long baud);
-    bool waitForLines(unsigned long ulTimeout, byte nrOfEols);
-    bool gotLine();
-    bool waitForReply(unsigned long uiTimeout, const char *pattern);
-    bool isModuleActive(unsigned long uiTimeout);
-    bool waitForStartup(unsigned long baudrate);
-    void updateHandles();
-    void cyclePower(OPERATING_MODES om);
-    bool parseAdvertisement(char* buffer);
-    void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
     word countChars(char* buf, char findc);
+    void cyclePower(OPERATING_MODES om);
+    bool doFactoryDefault();
+    bool gotLine();
+    void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
+    bool isModuleActive(unsigned long uiTimeout);
+    bool parseAdvertisement(char* buffer);
+    bool setBaudrate(unsigned long baud);
+    void updateHandles();
+    bool waitForLines(unsigned long ulTimeout, byte nrOfEols);
+    bool waitForReply(unsigned long uiTimeout, const char *pattern);
+    bool waitForStartup(unsigned long baudrate);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
@@ -69,6 +73,7 @@ private:
     void (*_ftConnectionStateChanged)(bool bUp);
     void (*_ftBondingRequested)(void);
     void (*_ftAdvertisementReceived)(ADVERTISEMENT* adv);
+    void (*_ftPasscodeGenerated)(unsigned long);
     btCharacteristic** _characteristicList;
     byte _characteristicCount;
     char _lastCreatedService[40];

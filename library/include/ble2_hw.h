@@ -314,7 +314,7 @@ void ble2_display_critical_info();
  * @return
  * 0 if sucessful, -1 if failed
  */
-int8_t ble2_start_connection(mac_address_t mac_address_type,char* mac_address );
+int8_t ble2_start_connection(mac_address_t mac_address_type, const char* mac_address );
 /**
  * @brief
  * Used to query the peripheral devices before establishing a connection.

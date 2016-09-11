@@ -46,12 +46,54 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _pinEnPwr(pinEnPwr),
     _pinActive_12(pinBtActive),
     _ftConnectionStateChanged(0),
-    _characteristicCount(0)
+    _characteristicCount(0),
+    _ftAdvertisementReceived(0),
+    _ftBondingRequested(0),
+    _ftPasscodeGenerated(0)
 {
     sPort=&s;
     sPortDebug=sw;
     memset(_lastCreatedService,'\0',sizeof(_lastCreatedService));
     ble2_hal_init();
+}
+
+bool rn4020::addCharacteristic(btCharacteristic* bt)
+{
+    if(bt->getHandle())
+    {
+        //handle already exists
+        return true;
+    }
+    if(strcmp(_lastCreatedService, bt->getUuidService()))
+    {
+        //Service not created in previous call.  Create it now.
+        strcpy(_lastCreatedService, bt->getUuidService());
+        ble2_set_private_service_uuid(_lastCreatedService);
+        if(!waitForReply(2000,"AOK"))
+        {
+            return false;
+        }
+    }
+    //Set characteristics of the created service:
+    ble2_set_private_characteristics(bt->getUuidCharacteristic(),bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
+    if(!waitForReply(2000,"AOK"))
+    {
+        return false;
+    }
+    //Created characteristics only become available after reboot.
+    if(!doReboot(2400))
+    {
+        return false;
+    }
+    _characteristicList = (btCharacteristic**) realloc(_characteristicList, (_characteristicCount + 1) * sizeof(btCharacteristic*));
+    if(!_characteristicList)
+    {
+        return false;
+    }
+    _characteristicList[_characteristicCount++]=bt;
+    //Get the handle of the characteristic
+    updateHandles();
+    return true;
 }
 
 bool rn4020::begin(unsigned long baudrate, ROLES role)
@@ -104,7 +146,23 @@ bool rn4020::begin(unsigned long baudrate, ROLES role)
     default:
         return false;
     }
+    _role=role;
     return waitForReply(2000,"AOK");
+}
+
+word rn4020::countChars(char* buf, char findc)
+{
+    char* pch=buf;
+    word ctr=0;
+    while(*pch)
+    {
+        if(*pch==findc)
+        {
+            ctr++;
+        }
+        pch++;
+    }
+    return ctr;
 }
 
 void rn4020::cyclePower(OPERATING_MODES om)
@@ -120,21 +178,211 @@ void rn4020::cyclePower(OPERATING_MODES om)
     }
 }
 
-void rn4020::setConnectionListener(void (*ftConnection)(bool))
+bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
 {
-    _ftConnectionStateChanged=ftConnection;
+    if(bStartNotStop)
+    {
+        //Start
+        ble2_start_advertisement(interval_ms,0);
+    }else
+    {
+        //Stop
+        ble2_stop_advertising();
+    }
+    return waitForReply(2000,"AOK");
 }
 
-void rn4020::setBondingListener(void (*ftBonding)(void))
+bool rn4020::doConnecting(const char* remoteBtAddress)
 {
-    _ftBondingRequested=ftBonding;
+    if(_role!=RL_CENTRAL)
+    {
+        return false;
+    }
+    if(ble2_start_connection(PUBLIC_ADDRESS, remoteBtAddress)!=0)
+    {
+        return false;
+    }
+    return waitForReply(10000,"AOK\r\n");
 }
 
-void rn4020::setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*))
+/* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
+ * power.  Take this into account when designing a PCB with this module.  You should be able to toggle the power
+ * of the RN4020 with a GPIO of your MCU.
+ * At power up, the SW_WAKE pin is held high to force full factory reset when toggling the HW_WAKE lines.
+ */
+bool rn4020::doFactoryDefault()
 {
-    _ftAdvertisementReceived=ftAdvertisementReceived;
+    setOperatingMode(OM_NORMAL);
+    delay(200);
+#if DEBUG_LEVEL >= DEBUG_ALL
+    sPortDebug->println("Forcing factory default.");
+#endif
+    for(byte i=0;i<8;i++)
+    {
+        digitalWrite(_pinWake_hw_15, HIGH);
+        delay(200);
+        digitalWrite(_pinWake_hw_15, LOW);
+        delay(200);
+    }
+    //Give module time to reset.
+    //It won't send any data to signal a succeeded factory reset.  Pin 12 will remain high
+    delay(1500);
+    //Force reboot.  It allows us to check if the module communication is OK again.
+    cyclePower(OM_NORMAL);
+    //Factory default baud=115200
+    return waitForStartup(115200);
 }
 
+/* Scan for undirected advertisements.
+ * Bonded (but unconnected) devices will send directed advertisements (unless configured otherwise with "SR")
+ * Devices sending directed advertisements will not be listed.
+ */
+bool rn4020::doFindRemoteDevices(bool bEnabled)
+{
+    if(bEnabled)
+    {
+        ble2_query_peripheral_devices(0,0);
+    }
+    else
+    {
+        ble2_stop_inquiry_process();
+    }
+    return waitForReply(2000,"AOK\r\n");
+}
+
+bool rn4020::doReboot(unsigned long baudrate)
+{
+    ble2_device_reboot();
+    //ProTrinket 3V gets framing errors when trying to receive the "Reboot" at 115200baud.
+    //waitForReply(2000,"Reboot");
+    return waitForStartup(baudrate);
+}
+
+bool rn4020::getBluetoothDeviceName(char* btName)
+{
+    if(!btName)
+    {
+        return false;
+    }
+    ble2_display_critical_info();
+    if(!waitForLines(2000, 8))
+    {
+        return false;
+    }
+    //Parse response line by line
+    char* pch = strtok (rxbuf,"\r\n");
+    while (pch != NULL)
+    {
+        if(sscanf(pch, "Name=%20s", btName)==1)
+        {
+            return true;
+        }
+        pch = strtok (NULL, "\r\n");
+    }
+    return false;
+}
+
+bool rn4020::getMacAddress(byte* array, byte& length)
+{
+    if(!array)
+    {
+        return false;
+    }
+    char hexarray[12];
+    ble2_display_critical_info();
+    if(!waitForLines(2000, 8))
+    {
+        return false;
+    }
+    //Parse response line by line
+    char* pch = strtok (rxbuf,"\r\n");
+    while (pch != NULL)
+    {
+        if(sscanf(pch, "BTA=%12s", hexarray)==1)
+        {
+            //MAC address contains 6 bytes
+            length=6;
+            hex2array(hexarray, array, length);
+            return true;
+        }
+        pch = strtok (NULL, "\r\n");
+    }
+}
+
+bool rn4020::gotLine()
+{
+    if(!sPort->available())
+    {
+        return false;
+    }
+    char c=sPort->read();
+    if(c!='\xFF' && c!='\0')
+    {
+        rxbuf[indexRxBuf]=c;
+        rxbuf[++indexRxBuf]='\0';
+        if(indexRxBuf==BUFFSIZE-1)
+        {
+            //Reset buffer when there's an overflow
+            indexRxBuf=0;
+        }
+    }
+#if DEBUG_LEVEL >= DEBUG_ALL
+    static char b=0,d=0;
+    if(b==0 && d==0)
+    {
+        sPortDebug->print("\r\nRX: ");
+    }
+    if(c>27)
+    {
+        sPortDebug->print(c);
+    }
+    b=d;
+    d=c;
+    if(b=='\r' && d=='\n')
+    {
+        sPortDebug->print("\r\nRX: ");
+    }
+#endif
+    return strstr(rxbuf,"\r\n");
+}
+
+void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
+{
+    if((!arrayOut) || (!hexstringIn))
+    {
+        return;
+    }
+    lengthOut=strlen(hexstringIn)>>1;
+    for(byte i=0;i<lengthOut;i++)
+    {
+        sscanf(hexstringIn+(i<<1),"%2x", arrayOut+i);
+    }
+}
+
+bool rn4020::isModuleActive(unsigned long uiTimeout)
+{
+    unsigned long ulStartTime=millis();
+    if(!digitalRead(_pinActive_12))
+    {
+        //Clean serial port buffer
+        while(sPort->available())
+        {
+            sPort->read();
+        }
+    }
+    while(!digitalRead(_pinActive_12))
+    {
+        //Typically pin12 comes high 1.28s after powerup.
+        if(millis()>ulStartTime+uiTimeout)
+        {
+#if DEBUG_LEVEL >= DEBUG_ALL
+            sPortDebug->println("Module doesn't become active");
+#endif
+            return false;
+        }
+    }
+    return true;
+}
 
 void rn4020::loop()
 {
@@ -142,6 +390,7 @@ void rn4020::loop()
     word handle;
     byte length;
     char value[42];
+    unsigned long passcode;
     if(!strncmp(rxbuf, "Passcode:", 9) && _ftBondingRequested)
     {
         _ftBondingRequested();
@@ -182,6 +431,11 @@ void rn4020::loop()
         }
         bEventHandled=true;
     }
+    if(sscanf(rxbuf, "Peer Passcode:%d",&passcode)==1 && _ftPasscodeGenerated)
+    {
+        _ftPasscodeGenerated(passcode);
+        bEventHandled=true;
+    }
     if(parseAdvertisement(rxbuf))
     {
         bEventHandled=true;
@@ -199,7 +453,11 @@ void rn4020::loop()
 bool rn4020::parseAdvertisement(char* buffer)
 {
     byte i=0;
-    char* advertisement=(char*)malloc(strlen(buffer));
+    char* advertisement=(char*)malloc(strlen(buffer)+1);
+    if(!advertisement)
+    {
+        return false;
+    }
     strcpy(advertisement, buffer);
     char* pch = strtok (advertisement,",");
     ADVERTISEMENT adv;
@@ -230,77 +488,15 @@ bool rn4020::parseAdvertisement(char* buffer)
     return true;
 }
 
-bool rn4020::setTxPower(byte pwr)
-{
-    if(pwr>7)
-    {
-        return false;
-    }
-    ble2_set_transmission_power((tx_pwr_t)pwr);
-    return waitForReply(2000,"AOK");
-}
-
-bool rn4020::getMacAddress(byte* array, byte& length)
-{
-    if(!array)
-    {
-        return false;
-    }
-    char hexarray[12];
-    ble2_display_critical_info();
-    if(!waitForLines(2000, 8))
-    {
-        return false;
-    }
-    //Parse response line by line
-    char* pch = strtok (rxbuf,"\r\n");
-    while (pch != NULL)
-    {
-        if(sscanf(pch, "BTA=%12s", hexarray)==1)
-        {
-            //MAC address contains 6 bytes
-            length=6;
-            hex2array(hexarray, array, length);
-            return true;
-        }
-        pch = strtok (NULL, "\r\n");
-    }
-}
-
 bool rn4020::removePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
     return waitForReply(2000,"AOK");
 }
 
-bool rn4020::setBluetoothDeviceName(const char* btName)
+void rn4020::setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*))
 {
-    ble2_set_device_bluetooth_name(btName);
-    return waitForReply(2000,"AOK");
-}
-
-bool rn4020::getBluetoothDeviceName(char* btName)
-{
-    if(!btName)
-    {
-        return false;
-    }
-    ble2_display_critical_info();
-    if(!waitForLines(2000, 8))
-    {
-        return false;
-    }
-    //Parse response line by line
-    char* pch = strtok (rxbuf,"\r\n");
-    while (pch != NULL)
-    {
-        if(sscanf(pch, "Name=%20s", btName)==1)
-        {
-            return true;
-        }
-        pch = strtok (NULL, "\r\n");
-    }
-    return false;
+    _ftAdvertisementReceived=ftAdvertisementReceived;
 }
 
 bool rn4020::setBaudrate(unsigned long baud)
@@ -340,11 +536,31 @@ bool rn4020::setBaudrate(unsigned long baud)
     return waitForReply(2000,"AOK");
 }
 
+bool rn4020::setBluetoothDeviceName(const char* btName)
+{
+    ble2_set_device_bluetooth_name(btName);
+    return waitForReply(2000,"AOK");
+}
+
+void rn4020::setBondingListener(void (*ftBonding)(void))
+{
+    _ftBondingRequested=ftBonding;
+}
+
+void rn4020::setBondingPasscodeListener(void (*ftPasscode)(unsigned long))
+{
+    _ftPasscodeGenerated=ftPasscode;
+}
+
 void rn4020::setBondingPasscode(const char* passcode)
 {
     ble2_set_passcode(passcode);
 }
 
+void rn4020::setConnectionListener(void (*ftConnection)(bool))
+{
+    _ftConnectionStateChanged=ftConnection;
+}
 
 //http://microchip.wikidot.com/ble:rn4020-power-states
 bool rn4020::setOperatingMode(OPERATING_MODES om)
@@ -382,121 +598,24 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
     }
 }
 
-/* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
- * power.  Take this into account when designing a PCB with this module.  You should be able to toggle the power
- * of the RN4020 with a GPIO of your MCU.
- * At power up, the SW_WAKE pin is held high to force full factory reset when toggling the HW_WAKE lines.
- */
-bool rn4020::doFactoryDefault()
+bool rn4020::setTxPower(byte pwr)
 {
-    setOperatingMode(OM_NORMAL);
-    delay(200);
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->println("Forcing factory default.");
-#endif
-    for(byte i=0;i<8;i++)
-    {
-        digitalWrite(_pinWake_hw_15, HIGH);
-        delay(200);
-        digitalWrite(_pinWake_hw_15, LOW);
-        delay(200);
-    }
-    //Give module time to reset.
-    //It won't send any data to signal a succeeded factory reset.  Pin 12 will remain high
-    delay(1500);
-    //Force reboot.  It allows us to check if the module communication is OK again.
-    cyclePower(OM_NORMAL);
-    //Factory default baud=115200
-    return waitForStartup(115200);
-}
-
-bool rn4020::doReboot(unsigned long baudrate)
-{
-    ble2_device_reboot();
-    //ProTrinket 3V gets framing errors when trying to receive the "Reboot" at 115200baud.
-    //waitForReply(2000,"Reboot");
-    return waitForStartup(baudrate);
-}
-
-bool rn4020::addCharacteristic(btCharacteristic* bt)
-{
-    if(bt->getHandle())
-    {
-        //handle already exists
-        return true;
-    }
-    if(strcmp(_lastCreatedService, bt->getUuidService()))
-    {
-        //Service not created in previous call.  Create it now.
-        strcpy(_lastCreatedService, bt->getUuidService());
-        ble2_set_private_service_uuid(_lastCreatedService);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-    }
-    //Set characteristics of the created service:
-    ble2_set_private_characteristics(bt->getUuidCharacteristic(),bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
-    if(!waitForReply(2000,"AOK"))
+    if(pwr>7)
     {
         return false;
     }
-    //Created characteristics only become available after reboot.
-    if(!doReboot(2400))
-    {
-        return false;
-    }
-    _characteristicList = (btCharacteristic**) realloc(_characteristicList, (_characteristicCount + 1) * sizeof(btCharacteristic*));
-    if(!_characteristicList)
-    {
-        return false;
-    }
-    _characteristicList[_characteristicCount++]=bt;
-    //Get the handle of the characteristic
-    updateHandles();
-    return true;
-}
-
-bool rn4020::doFindRemoteDevices(bool bEnabled)
-{
-    if(bEnabled)
-    {
-        ble2_query_peripheral_devices(0,0);
-    }
-    else
-    {
-        ble2_stop_inquiry_process();
-    }
-    return waitForReply(2000,"AOK\r\n");
-}
-
-
-bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
-{
-    if(bStartNotStop)
-    {
-        //Start
-        ble2_start_advertisement(interval_ms,0);
-    }else
-    {
-        //Stop
-        ble2_stop_advertising();
-    }
+    ble2_set_transmission_power((tx_pwr_t)pwr);
     return waitForReply(2000,"AOK");
 }
 
-
-bool rn4020::waitForStartup(unsigned long baudrate)
+bool rn4020::startBonding()
 {
-    sPort->end();
-    sPort->begin(baudrate);
-    //After power up, it takes about 1.28s for the RN4020 to become active
-    if(!isModuleActive(1500))
+    if(_role!=RL_CENTRAL)
     {
         return false;
     }
-    //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART
-    return waitForReply(2000,"CMD");
+    ble2_bond(SAVED);
+    return waitForReply(10000,"AOK\r\n");
 }
 
 /* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
@@ -561,29 +680,14 @@ void rn4020::updateHandles()
     }while (pch != NULL);
 }
 
-bool rn4020::isModuleActive(unsigned long uiTimeout)
+bool rn4020::waitForLines(unsigned long ulTimeout, byte nrOfEols)
 {
     unsigned long ulStartTime=millis();
-    if(!digitalRead(_pinActive_12))
+    while(millis()<ulStartTime+ulTimeout && countChars(rxbuf,'\n')<nrOfEols)
     {
-        //Clean serial port buffer
-        while(sPort->available())
-        {
-            sPort->read();
-        }
+        gotLine();
     }
-    while(!digitalRead(_pinActive_12))
-    {
-        //Typically pin12 comes high 1.28s after powerup.
-        if(millis()>ulStartTime+uiTimeout)
-        {
-#if DEBUG_LEVEL >= DEBUG_ALL
-            sPortDebug->println("Module doesn't become active");
-#endif
-            return false;
-        }
-    }
-    return true;
+    return countChars(rxbuf,'\n');
 }
 
 //Read multiple lines and search for pattern
@@ -606,77 +710,15 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     return strstr(rxbuf, pattern);
 }
 
-bool rn4020::waitForLines(unsigned long ulTimeout, byte nrOfEols)
+bool rn4020::waitForStartup(unsigned long baudrate)
 {
-    unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+ulTimeout && countChars(rxbuf,'\n')<nrOfEols)
-    {
-        gotLine();
-    }
-    return countChars(rxbuf,'\n');
-}
-
-bool rn4020::gotLine()
-{
-    if(!sPort->available())
+    sPort->end();
+    sPort->begin(baudrate);
+    //After power up, it takes about 1.28s for the RN4020 to become active
+    if(!isModuleActive(1500))
     {
         return false;
     }
-    char c=sPort->read();
-    if(c!='\xFF' && c!='\0')
-    {
-        rxbuf[indexRxBuf]=c;
-        rxbuf[++indexRxBuf]='\0';
-        if(indexRxBuf==BUFFSIZE-1)
-        {
-            //Reset buffer when there's an overflow
-            indexRxBuf=0;
-        }
-    }
-#if DEBUG_LEVEL >= DEBUG_ALL
-    static char b=0,d=0;
-    if(b==0 && d==0)
-    {
-        sPortDebug->print("\r\nRX: ");
-    }
-    if(c>27)
-    {
-        sPortDebug->print(c);
-    }
-    b=d;
-    d=c;
-    if(b=='\r' && d=='\n')
-    {
-        sPortDebug->print("\r\nRX: ");
-    }
-#endif
-    return strstr(rxbuf,"\r\n");
-}
-
-void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
-{
-    if((!arrayOut) || (!hexstringIn))
-    {
-        return;
-    }
-    lengthOut=strlen(hexstringIn)>>1;
-    for(byte i=0;i<lengthOut;i++)
-    {
-        sscanf(hexstringIn+(i<<1),"%2x", arrayOut+i);
-    }
-}
-
-word rn4020::countChars(char* buf, char findc)
-{
-    char* pch=buf;
-    word ctr=0;
-    while(*pch)
-    {
-        if(*pch==findc)
-        {
-            ctr++;
-        }
-        pch++;
-    }
-    return ctr;
+    //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART
+    return waitForReply(2000,"CMD");
 }
