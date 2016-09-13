@@ -1,4 +1,4 @@
-#include "rn4020.h"
+﻿#include "rn4020.h"
 #include "ble2_hw.h"
 
 #define DEBUG_LEVEL DEBUG_ALL
@@ -48,7 +48,7 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _ftConnectionStateChanged(0),
     _characteristicCount(0),
     _ftAdvertisementReceived(0),
-    _ftBondingRequested(0),
+    _ftBondingEvent(0),
     _ftPasscodeGenerated(0)
 {
     sPort=&s;
@@ -136,6 +136,7 @@ bool rn4020::begin(unsigned long baudrate, ROLES role)
         break;
     case RL_CENTRAL:
         //Services: Device Information + Battery Level services enabled
+        //ble2_set_server_services(0xC0480000);
         ble2_set_server_services(0xC0000000);
         if(!waitForReply(2000,"AOK"))
         {
@@ -203,6 +204,12 @@ bool rn4020::doConnecting(const char* remoteBtAddress)
         return false;
     }
     return waitForReply(10000,"AOK\r\n");
+}
+
+bool rn4020::doDisconnect()
+{
+    ble2_kill_active_connection();
+    return waitForReply(2000,"AOK\r\n");
 }
 
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
@@ -391,9 +398,9 @@ void rn4020::loop()
     byte length;
     char value[42];
     unsigned long passcode;
-    if(!strncmp(rxbuf, "Passcode:", 9) && _ftBondingRequested)
+    if(!strncmp(rxbuf, "Passcode:", 9) && _ftBondingEvent)
     {
-        _ftBondingRequested();
+        _ftBondingEvent(BD_PASSCODE_NEEDED);
         bEventHandled=true;
         *rxbuf='\0';    //avoid future calls
     }else
@@ -402,9 +409,13 @@ void rn4020::loop()
         {
             return;
         }
-
     }
     indexRxBuf=0;
+    if(strstr(rxbuf, "Secured") && _ftBondingEvent)
+    {
+        _ftBondingEvent(BD_ESTABLISHED);
+        bEventHandled=true;
+    }
     if(strstr(rxbuf, "Connected") && _ftConnectionStateChanged)
     {
         _ftConnectionStateChanged(true);
@@ -459,26 +470,28 @@ bool rn4020::parseAdvertisement(char* buffer)
         return false;
     }
     strcpy(advertisement, buffer);
-    char* pch = strtok (advertisement,",");
+    char* pch = strrchr(advertisement,',');
     ADVERTISEMENT adv;
 
     for(i=0;i<4 && pch != NULL;i++)
     {
+        pch = strrchr(advertisement,',');
         switch(i)
         {
         case 0:
-            strcpy(adv.btAddress,pch);
+            adv.rssi=atoi(pch+1);
+            break;
         case 1:
+            strcpy(adv.privCharacteristic, pch+1);
             break;
         case 2:
-            strcpy(adv.privCharacteristic, pch);
             break;
         case 3:
-            adv.rssi=atoi(pch);
             break;
         }
-        pch = strtok (NULL, ",");
+        *pch = '\0';
     }
+    strcpy(adv.btAddress,advertisement);
     free(advertisement);
     if(i!=4 || (!_ftAdvertisementReceived))
     {
@@ -542,9 +555,9 @@ bool rn4020::setBluetoothDeviceName(const char* btName)
     return waitForReply(2000,"AOK");
 }
 
-void rn4020::setBondingListener(void (*ftBonding)(void))
+void rn4020::setBondingListener(void (*ftBonding)(BONDING_MODES bd))
 {
-    _ftBondingRequested=ftBonding;
+    _ftBondingEvent=ftBonding;
 }
 
 void rn4020::setBondingPasscodeListener(void (*ftPasscode)(unsigned long))
@@ -615,7 +628,7 @@ bool rn4020::startBonding()
         return false;
     }
     ble2_bond(SAVED);
-    return waitForReply(10000,"AOK\r\n");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 /* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics

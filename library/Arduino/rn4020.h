@@ -33,11 +33,17 @@ public:
         char privCharacteristic[33];
         char rssi;
     }ADVERTISEMENT;
+    typedef enum
+    {
+        BD_PASSCODE_NEEDED,
+        BD_ESTABLISHED
+    }BONDING_MODES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
     bool addCharacteristic(btCharacteristic* bt);
     bool begin(unsigned long baudrate, ROLES role);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool doConnecting(const char* remoteBtAddress);
+    bool doDisconnect();
     bool doFindRemoteDevices(bool bEnabled);
     bool doReboot(unsigned long baudrate);
     bool getBluetoothDeviceName(char* btName);
@@ -46,7 +52,7 @@ public:
     bool removePrivateCharacteristics();
     void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool setBluetoothDeviceName(const char* btName);
-    void setBondingListener(void (*ftBonding)(void));
+    void setBondingListener(void (*ftBonding)(BONDING_MODES bd));
     void setBondingPasscodeListener(void (*ftPasscode)(unsigned long));
     void setBondingPasscode(const char* passcode);
     void setConnectionListener(void (*ftConnection)(bool));
@@ -71,7 +77,7 @@ private:
     byte _pinWake_hw_15;//RN4020 pin 15
     byte _pinEnPwr;
     void (*_ftConnectionStateChanged)(bool bUp);
-    void (*_ftBondingRequested)(void);
+    void (*_ftBondingEvent)(BONDING_MODES bd);
     void (*_ftAdvertisementReceived)(ADVERTISEMENT* adv);
     void (*_ftPasscodeGenerated)(unsigned long);
     btCharacteristic** _characteristicList;

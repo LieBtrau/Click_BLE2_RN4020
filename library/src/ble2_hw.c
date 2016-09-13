@@ -283,8 +283,11 @@ void ble2_start_advertisement(uint16_t interval, uint16_t window_time)
 void ble2_bond(bond_saving_t parameter)
 {
     char tmp[10] = {0};
-    strcpy(tmp, "B,");
-    strcat(tmp, !parameter ? "0" : "1");
+    strcpy(tmp, "B");
+    if(!parameter)
+    {
+        strcat(tmp,",0");
+    }
 
     ble2_hal_send(tmp);
 }
