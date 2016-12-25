@@ -212,6 +212,7 @@ int8_t ble2_set_device_name(char* name)
     return status;
 }
 
+//See user guide RN4020, table 2-7
 void ble2_set_supported_features(uint32_t features)
 {
     char tmp[15] = {0};

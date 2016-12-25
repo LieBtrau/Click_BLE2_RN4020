@@ -3,7 +3,7 @@
 
 #define DEBUG_LEVEL DEBUG_ALL
 
-#ifdef ARDUINO_AVR_PROTRINKET3FTDI
+#if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
 #include <SoftwareSerial.h>
 static SoftwareSerial* sPortDebug;
 extern SoftwareSerial* sw;
@@ -131,7 +131,8 @@ bool rn4020::begin(unsigned long baudrate, ROLES role)
         {
             return false;
         }
-        //Enable authentication with Keyboard and display as IO-capabilities + server only
+        //Enable authentication with Keyboard and display as IO-capabilities
+        //Server only (services will only be served, no client functionalities)
         ble2_set_supported_features(0x00482000);
         break;
     case RL_CENTRAL:
@@ -142,6 +143,7 @@ bool rn4020::begin(unsigned long baudrate, ROLES role)
         {
             return false;
         }
+        //Central role
         ble2_set_supported_features(0x80000000);
         break;
     default:
