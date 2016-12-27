@@ -1,2 +1,8 @@
 *.b#*
+*.CFG
+*.lbr
+*.l#*
+*.pdf
 *.s#*
+*.scr
+*.txt
