@@ -1,20 +1,22 @@
-![MikroE](http://www.mikroe.com/img/designs/beta/logo_small.png)
-![BLE2 Click](http://www.mikroe.com/img/development-tools/accessory-boards/click/ble2_click/gallery/ble2_click_02.png)
-##By [MikroElektronika](http://www.mikroe.com)
+# BLE2 Click
+The original MikroE BLE2-click has some shortcomings.  The BLE2-click board described in this repository has some improvements over the original board:
+* Connection to reset the board.  The RN4020 doesn't have a reset.  The only way to implement a reset was to do a power toggle.  By sending illegal characters, it's possible to bring the RN4020 in a non-responsive state.  The only way of recovery is a power cycle of the RN4020.
+* Connection to the baseboard of the RN4020 activity status.
+* WAKE_HW signal connected to the baseboard, so that the RN4020 can be brought back to factory default state.
+* CMD/MLDP signal set fix low.  This might hinder full MLDP functionality.  Anyway, if you buy a bluetooth module to do MLDP, you had better spent your money on a NRF24L01+ module.
 
+## Hardware
+### BRD161224
+* [Schematic](https://drive.google.com/open?id=0B5_mAlpV8IjvNDhhZ1VFa0pTalE)
+* [Assembly Drawing](https://drive.google.com/open?id=0B5_mAlpV8IjvUFloZ0N6MFRrYnM)
+* [Drill Plan](https://drive.google.com/open?id=0B5_mAlpV8IjvWHlsd1NfR2djTkU)
+* [Films](https://drive.google.com/open?id=0B5_mAlpV8IjvTHRYaU1Lb0hmRk0)
 
 ---
 
-[Product Page](http://www.mikroe.com/click/ble2/)
+## Software
 
-[Libstock](http://libstock.mikroe.com/projects/view/1207/ble2-click)
+State: In progress
 
-[Tutorial](http://learn.mikroe.com/bluetooth-low-energy-part-3-ble-2-click/)
-
----
-
-Microchip’s RN4020 Bluetooth Low Energy Module provides a highly integrated solution for delivering low power Bluetooth 4.1 solutions.
-The advanced command interface offers rapid time to market. The RN4020 module complies with Bluetooth specification version 4.1. It integrates RF, a baseband controller,
-command API processor, making it a complete Bluetooth Low Energy Solution. The RN4020 can be used with either low cost microcontroller for intelligent Bluetooth Low Energy applications.
-For simple sensor applications, the RN4020 internal scripting capabilities enable basic functions to be implemented without the need for external host
-MCU or software development tools.
+The original MikroE library is far from complete.  It only holds functions to send data to the RN4020.  There's no functionality to parse the response from the RN4020.  
+This library will include a central/peripheral application using private characteristics, implemented for Arduino.
