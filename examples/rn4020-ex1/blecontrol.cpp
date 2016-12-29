@@ -65,20 +65,20 @@ bool bleControl::begin(bool bCentral)
 {
     char dataname[20];
     const char BT_NAME_KEYFOB[]="AiakosKeyFob";
-    const char BT_NAME_BIKE[]="AiakosBike";
+    const char BT_NAME_BIKE[]="AiakosBik2";
 
     bIsCentral=bCentral;
     //Switch to 2400baud
     // + It's more reliable than 115200baud with the ProTrinket 3V.
     // + It also works when the module is in deep sleep mode.
-    if(!rn.begin(2400, bCentral ? rn4020::RL_CENTRAL : rn4020::RL_PERIPHERAL))
+    if(!rn.begin(2400))
     {
         return false;
     }
     rn.setConnectionListener(connectionEvent);
     rn.setBondingListener(bondingEvent);
     //Check if settings have already been done.  If yes, we don't have to set them again.
-    //This is check is performed by checking if the last setting command has finished successfully:
+    //This is check is performed by verifying if the last setting command has finished successfully:
     if(!rn.getBluetoothDeviceName(dataname))
     {
         return false;
@@ -88,11 +88,25 @@ bool bleControl::begin(bool bCentral)
         //Central
         if(strncmp(dataname,BT_NAME_BIKE, strlen(BT_NAME_BIKE)))
         {
+            //Module not yet correctly configured
+
+            //Services: Device Information + Battery Level services
+            if(!rn.setServices(0xC0000000))
+            {
+                return false;
+            }
+            //Central role
+            //Enable authentication with Keyboard and display as IO-capabilities
+            if(!rn.setFeatures(0x80480000))
+            {
+                return false;
+            }
             if(!rn.setBluetoothDeviceName(BT_NAME_BIKE))
             {
                 return false;
             }
-            //Settings only becomes active after resetting the module.
+            //Settings only become active after resetting the module.
+            rn.doReboot(2400);
             if(!rn.doReboot(2400))
             {
                 return false;
@@ -106,6 +120,19 @@ bool bleControl::begin(bool bCentral)
         //Peripheral
         if(strncmp(dataname,BT_NAME_KEYFOB, strlen(BT_NAME_KEYFOB)))
         {
+            //Module not yet correctly configured
+
+            //Enable authentication with Keyboard and display as IO-capabilities
+            //Server only (services will only be served, no client functionalities)
+            if(!rn.setFeatures(0x00482000))
+            {
+                return false;
+            }
+            //Services: Device Information + Battery Level + user defined private services
+            if(!rn.setServices(0xC0000001))
+            {
+                return false;
+            }
             if(!rn.setTxPower(0))
             {
                 return false;
@@ -115,7 +142,7 @@ bool bleControl::begin(bool bCentral)
                 return false;
             }
             //Power must be cycled after removing private characteristics
-            if(!rn.begin(2400, rn4020::RL_PERIPHERAL))
+            if(!rn.begin(2400))
             {
                 return false;
             }
@@ -132,7 +159,11 @@ bool bleControl::begin(bool bCentral)
             {
                 return false;
             }
-            //Normally reboot needed to make changes take effect, but that has already been done by adding characteristics.
+            //Settings only become active after resetting the module.
+            if(!rn.doReboot(2400))
+            {
+                return false;
+            }
         }
         //Start advertizing to make the RN4020 discoverable & connectable
         //Auto-advertizing is not used, because it doesn't allow for setting the advertisement interval
@@ -140,16 +171,6 @@ bool bleControl::begin(bool bCentral)
         {
             return false;
         }
-        //        byte mac[6];
-        //        byte macLength;
-        //        if(!rn.getMacAddress(mac, macLength))
-        //        {
-        //            return false;
-        //        }
-        //        for(byte i=0;i<macLength;i++)
-        //        {
-        //            Serial.println(mac[i], HEX);
-        //        }
         return rn.setOperatingMode(rn4020::OM_DEEP_SLEEP);
     }
 

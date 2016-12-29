@@ -4,34 +4,31 @@
 #include <SoftwareSerial.h>
 SoftwareSerial swPort(A3,A2);//RX, TX
 SoftwareSerial* sw=&swPort;
-#endif
-#ifdef ARDUINO_STM_NUCLEO_F103RB
+#elif defined(ARDUINO_STM_NUCLEO_F103RB)
 HardwareSerial* sw=&Serial;
 #endif
 
 #include "rn4020-ex1.h"
 
 //git clone git@github.com:LieBtrau/Arduino_STM32.git ~/git/Arduino_STM32
-//Remark that Arduino_STM32 doesn't seem to work with Arduino 1.6.7
-//ln -s ~/git/Arduino_STM32/ ~/Programs/arduino-1.6.5/hardware/
+//ln -s ~/git/Arduino_STM32/ ~/Programs/arduino-1.6.9/hardware/
 
 #include "blecontrol.h"
 
 //Build instruction:
 
 //Adjust build.path to suit your needs.  Don't make it a subfolder of the directory where your *.ino 's are located,
-//because Arduino 1.6.7 will compile these also, which will result in linking errors.
-//~/Programs/arduino-1.6.5/arduino --verify --board Arduino_STM32:STM32F1:nucleo_f103rb --pref target_package=Arduino_STM32 --pref build.path=/home/ctack/build --pref target_platform=STM32F1 --pref board=nucleo_f103rb ~/Arduino/blinky_nucleo/blinky_nucleo.ino
+//because Arduino 1.6.9 will compile these also, which will result in linking errors.
+//~/Programs/arduino-1.6.9/arduino --verify --board Arduino_STM32:STM32F1:nucleo_f103rb --pref target_package=Arduino_STM32 --pref build.path=/home/ctack/build --pref target_platform=STM32F1 --pref board=nucleo_f103rb ~/Arduino/blinky_nucleo/blinky_nucleo.ino
 
 
 
 uint32_t ulStartTime;
-uint32_t ulStartTime2;
 
 bleControl ble;
 
 void setup() {
-    ulStartTime2=ulStartTime=millis();
+    ulStartTime=millis();
     while (!(*sw)) ;
     sw->begin(9600);
     sw->println("I'm ready, folk!");
@@ -41,9 +38,10 @@ void setup() {
         sw->println("RN4020 not set up");
         return;
     }
-    if(ble.findUnboundPeripheral("001EC01D03EA"))
+    if(!ble.findUnboundPeripheral("001EC01D03EA"))
     {
-        sw->println("Remote peer found");
+        sw->println("Remote peer not found");
+        return;
     }
     secureConnect();
     delay(5000);
@@ -58,6 +56,7 @@ void loop() {
 
 void secureConnect()
 {
+    sw->println("Trying secure connect");
     bleControl::CONNECT_STATE state=bleControl::ST_NOTCONNECTED;
     do
     {

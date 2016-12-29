@@ -96,7 +96,7 @@ bool rn4020::addCharacteristic(btCharacteristic* bt)
     return true;
 }
 
-bool rn4020::begin(unsigned long baudrate, ROLES role)
+bool rn4020::begin(unsigned long baudrate)
 {
     pinMode(_pinEnPwr, OUTPUT);
     pinMode(_pinWake_hw_15, OUTPUT);
@@ -121,39 +121,10 @@ bool rn4020::begin(unsigned long baudrate, ROLES role)
             return false;
         }
     }
-    //Set module parameters
-    switch(role)
-    {
-    case RL_PERIPHERAL:
-        //Services: Device Information + Battery Level + user defined private services enabled
-        ble2_set_server_services(0xC0000001);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-        //Enable authentication with Keyboard and display as IO-capabilities
-        //Server only (services will only be served, no client functionalities)
-        ble2_set_supported_features(0x00482000);
-        break;
-    case RL_CENTRAL:
-        //Services: Device Information + Battery Level services enabled
-        //ble2_set_server_services(0xC0480000);
-        ble2_set_server_services(0xC0000000);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-        //Central role
-        ble2_set_supported_features(0x80000000);
-        break;
-    default:
-        return false;
-    }
-    _role=role;
-    return waitForReply(2000,"AOK");
+    return true;
 }
 
-word rn4020::countChars(char* buf, char findc)
+word rn4020::getNrOfOccurrence(char* buf, char findc)
 {
     char* pch=buf;
     word ctr=0;
@@ -197,10 +168,6 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
 
 bool rn4020::doConnecting(const char* remoteBtAddress)
 {
-    if(_role!=RL_CENTRAL)
-    {
-        return false;
-    }
     if(ble2_start_connection(PUBLIC_ADDRESS, remoteBtAddress)!=0)
     {
         return false;
@@ -274,7 +241,7 @@ bool rn4020::getBluetoothDeviceName(char* btName)
         return false;
     }
     ble2_display_critical_info();
-    if(!waitForLines(2000, 8))
+    if(!waitForNrOfLines(2000, 8))
     {
         return false;
     }
@@ -299,7 +266,7 @@ bool rn4020::getMacAddress(byte* array, byte& length)
     }
     char hexarray[12];
     ble2_display_critical_info();
-    if(!waitForLines(2000, 8))
+    if(!waitForNrOfLines(2000, 8))
     {
         return false;
     }
@@ -577,6 +544,13 @@ void rn4020::setConnectionListener(void (*ftConnection)(bool))
     _ftConnectionStateChanged=ftConnection;
 }
 
+bool rn4020::setFeatures(uint32_t features)
+{
+    ble2_set_supported_features(features);
+    return waitForReply(2000,"AOK");
+}
+
+
 //http://microchip.wikidot.com/ble:rn4020-power-states
 bool rn4020::setOperatingMode(OPERATING_MODES om)
 {
@@ -613,6 +587,12 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
     }
 }
 
+bool rn4020::setServices(uint32_t services)
+{
+    ble2_set_server_services(services);
+    return waitForReply(2000,"AOK");
+}
+
 bool rn4020::setTxPower(byte pwr)
 {
     if(pwr>7)
@@ -625,10 +605,6 @@ bool rn4020::setTxPower(byte pwr)
 
 bool rn4020::startBonding()
 {
-    if(_role!=RL_CENTRAL)
-    {
-        return false;
-    }
     ble2_bond(SAVED);
     return waitForReply(2000,"AOK\r\n");
 }
@@ -695,14 +671,14 @@ void rn4020::updateHandles()
     }while (pch != NULL);
 }
 
-bool rn4020::waitForLines(unsigned long ulTimeout, byte nrOfEols)
+bool rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 {
     unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+ulTimeout && countChars(rxbuf,'\n')<nrOfEols)
+    while(millis()<ulStartTime+ulTimeout && getNrOfOccurrence(rxbuf,'\n')<nrOfEols)
     {
         gotLine();
     }
-    return countChars(rxbuf,'\n');
+    return getNrOfOccurrence(rxbuf,'\n');
 }
 
 //Read multiple lines and search for pattern
@@ -727,6 +703,8 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
 
 bool rn4020::waitForStartup(unsigned long baudrate)
 {
+    delay(100);//give serial port time to send its last characters
+    sPort->flush();//on Nucleo, flush() simply clears buffers, it doesn't wait for TX-ing to finish.
     sPort->end();
     sPort->begin(baudrate);
     //After power up, it takes about 1.28s for the RN4020 to become active
