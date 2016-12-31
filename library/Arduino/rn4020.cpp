@@ -172,7 +172,12 @@ bool rn4020::doConnecting(const char* remoteBtAddress)
     {
         return false;
     }
-    return waitForReply(10000,"AOK\r\n");
+    if(!waitForReply(10000,"AOK\r\n"))
+    {
+        return false;
+    }
+    ble2_get_connection_status();
+    return waitForReply(2000,"Connected");
 }
 
 bool rn4020::doDisconnect()
@@ -232,6 +237,18 @@ bool rn4020::doReboot(unsigned long baudrate)
     //ProTrinket 3V gets framing errors when trying to receive the "Reboot" at 115200baud.
     //waitForReply(2000,"Reboot");
     return waitForStartup(baudrate);
+}
+
+bool rn4020::doRemoveBond()
+{
+    ble2_remove_bonding();
+    return waitForReply(2000,"AOK\r\n");
+}
+
+bool rn4020::doStopConnecting()
+{
+    ble2_stop_connection_process();
+    return waitForReply(2000,"AOK\r\n");
 }
 
 bool rn4020::getBluetoothDeviceName(char* btName)

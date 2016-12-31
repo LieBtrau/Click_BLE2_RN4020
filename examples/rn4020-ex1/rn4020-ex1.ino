@@ -64,7 +64,7 @@ void secureConnect()
         switch(state)
         {
         case bleControl::ST_PASS_GENERATED:
-            sw->print("Setting PASS: ");
+            sw->print("Peripheral must set PASS: ");
             sw->println(ble.getPasscode(), DEC);
             break;
         case bleControl::ST_BONDED:

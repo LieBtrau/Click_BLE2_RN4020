@@ -10,6 +10,7 @@ public:
     {
         ST_NOTCONNECTED,
         ST_PASS_GENERATED,
+        ST_PROV_BONDED,
         ST_BONDED
     }CONNECT_STATE;
     bleControl();

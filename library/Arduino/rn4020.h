@@ -46,6 +46,8 @@ public:
     bool doDisconnect();
     bool doFindRemoteDevices(bool bEnabled);
     bool doReboot(unsigned long baudrate);
+    bool doStopConnecting();
+    bool doRemoveBond();
     bool getBluetoothDeviceName(char* btName);
     bool getMacAddress(byte* array, byte& length);
     void loop();

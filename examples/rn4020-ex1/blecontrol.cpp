@@ -189,6 +189,9 @@ bool bleControl::loop()
 bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
 {
     bool bFound=false;
+    //Unbound first, otherwise the bonded module can't be found by a scan
+    //Don't check for return value, because if the central was not bonded, an "ERR" will be returned.
+    rn.doRemoveBond();
     //Start search
     if(!rn.doFindRemoteDevices(true))
     {
@@ -221,6 +224,8 @@ bleControl::CONNECT_STATE bleControl::secureConnect(const char* remoteBtAddress,
     case ST_NOTCONNECTED:
         if(!rn.doConnecting(remoteBtAddress))
         {
+            //stop connecting process
+            rn.doStopConnecting();
             return ST_NOTCONNECTED;
         }
         delay(1000);
@@ -240,7 +245,7 @@ bleControl::CONNECT_STATE bleControl::secureConnect(const char* remoteBtAddress,
             }
             if(bIsBonded)
             {
-                return ST_BONDED;
+                return ST_PROV_BONDED;
             }
         }
         disconnect();
@@ -252,11 +257,17 @@ bleControl::CONNECT_STATE bleControl::secureConnect(const char* remoteBtAddress,
             loop();
             if(bIsBonded)
             {
-                return ST_BONDED;
+                return ST_PROV_BONDED;
             }
         }
         disconnect();
         return ST_NOTCONNECTED;
+    case ST_PROV_BONDED:
+        if(!rn.startBonding())
+        {
+            rn.doDisconnect();
+            return ST_NOTCONNECTED;
+        }
     case ST_BONDED:
         return ST_BONDED;
     }
@@ -318,7 +329,7 @@ void connectionEvent(bool bConnectionUp)
         sw->println("down");
         if(!bIsCentral)
         {
-            //After connection went down, advertizing must be restarted or the module will no longer be connectable.
+            //After connection goes down, advertizing must be restarted or the module will no longer be connectable.
             if(!rn.doAdvertizing(true,5000))
             {
                 return;
