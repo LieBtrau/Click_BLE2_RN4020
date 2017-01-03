@@ -251,6 +251,23 @@ bool rn4020::doStopConnecting()
     return waitForReply(2000,"AOK\r\n");
 }
 
+bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
+{
+    char hexarray[41];//maximum data length=20 bytes
+    ble2_read_characteristic_content(handle);
+    if(!waitForNrOfLines(2000,1))
+    {
+        return false;
+    }
+    if(sscanf(rxbuf, "R,%40s.", hexarray)!=1)
+    {
+        return false;
+    }
+    hex2array(hexarray, array, length);
+    return true;
+}
+
+
 bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte length)
 {
     char* hexString=(char*)malloc((length<<1)+1);
@@ -363,7 +380,7 @@ word rn4020::getRemoteHandle(const char* service, const char* characteristic)
                     //                    sPortDebug->println("Setting handle");
                     //                    sPortDebug->println(handle, HEX);
                     //#endif
-                   return handle;
+                    return handle;
 
                 }
                 state=0;
@@ -762,7 +779,7 @@ void rn4020::updateHandles()
     }while (pch != NULL);
 }
 
-bool rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
+word rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 {
     unsigned long ulStartTime=millis();
     while(millis()<ulStartTime+ulTimeout && getNrOfOccurrence(rxbuf,'\n')<nrOfEols)

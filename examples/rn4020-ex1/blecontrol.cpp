@@ -280,15 +280,46 @@ unsigned long bleControl::getPasscode()
 
 bool bleControl::writeServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTICS chr, byte value)
 {
-    char services[1][5]={"1802"};
-    char characteristics[1][5]={"2A06"};
+    word handle=getRemoteHandle(serv,chr);
+    if(!handle)
+    {
+        return false;
+    }
+    return rn.doWriteRemoteCharacteristic(handle,&value,1);
+}
+
+bool bleControl::readServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTICS chr, byte* value, byte& length)
+{
+    word handle=getRemoteHandle(serv,chr);
+    if(!handle)
+    {
+        return false;
+    }
+    return rn.doReadRemoteCharacteristic(handle, value, length);
+}
+
+bool bleControl::getLocalMacAddress(byte* address, byte& length)
+{
+    return rn.getMacAddress(address, length);
+}
+
+
+/* Handles are fetched from the server on every read/write request.  That's the simplest thing to do, but it's far from
+ * power efficient for the peripheral.
+ */
+word bleControl::getRemoteHandle(BLE_SERVICES serv, BLE_CHARACTERISTICS chr)
+{
+    char services[2][5]={"1802","180A"};
+    char characteristics[2][5]={"2A06","2A25"};
     char* servptr, *chrptr;
-    word handle;
 
     switch(serv)
     {
     case BLE_S_IMMEDIATE_ALERT_SERVICE:
         servptr=services[0];
+        break;
+    case BLE_S_DEVICE_INFORMATION:
+        servptr=services[1];
         break;
     default:
         return false;
@@ -298,22 +329,14 @@ bool bleControl::writeServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTI
     case BLE_CH_ALERT_LEVEL:
         chrptr=characteristics[0];
         break;
+    case BLE_CH_SERIAL_NUMBER_STRING:
+        chrptr=characteristics[1];
+        break;
     default:
         return false;
     }
 
-    handle=rn.getRemoteHandle(servptr,chrptr);
-    if(!handle)
-    {
-        return false;
-    }
-
-    return rn.doWriteRemoteCharacteristic(handle,&value,1);
-}
-
-bool bleControl::getLocalMacAddress(byte* address, byte& length)
-{
-    return rn.getMacAddress(address, length);
+    return rn.getRemoteHandle(servptr,chrptr);
 }
 
 void advertisementEvent(rn4020::ADVERTISEMENT* adv)

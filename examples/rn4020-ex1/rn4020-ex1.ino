@@ -44,7 +44,19 @@ void setup() {
         return;
     }
     secureConnect();
+
+    //Example of writing a characteristic
     ble.writeServiceCharacteristic(bleControl::BLE_S_IMMEDIATE_ALERT_SERVICE, bleControl::BLE_CH_ALERT_LEVEL,1);
+
+    //Example of reading a characteristic
+    byte value[20];
+    byte length;
+    ble.readServiceCharacteristic(bleControl::BLE_S_DEVICE_INFORMATION,bleControl::BLE_CH_SERIAL_NUMBER_STRING,
+                                  value, length);
+    value[length]='\0';
+    sw->print("Serial number of peripheral is: ");
+    sw->println((char*)value);
+
     delay(5000);
     ble.disconnect();
     delay(5000);

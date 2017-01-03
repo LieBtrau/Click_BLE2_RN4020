@@ -49,6 +49,7 @@ public:
     bool doStopConnecting();
     bool doRemoveBond();
     bool doRemovePrivateCharacteristics();
+    bool doReadRemoteCharacteristic(word handle, byte* array, byte& length);
     bool doWriteRemoteCharacteristic(word handle, const byte *array, byte length);
     bool getBluetoothDeviceName(char* btName);
     bool getMacAddress(byte* array, byte& length);
@@ -75,7 +76,7 @@ private:
     bool parseAdvertisement(char* buffer);
     bool setBaudrate(unsigned long baud);
     void updateHandles();
-    bool waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols);
+    word waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
     bool waitForStartup(unsigned long baudrate);
     byte _pinWake_sw_7; //RN4020 pin 7
