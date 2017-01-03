@@ -39,8 +39,8 @@ public:
         BD_ESTABLISHED
     }BONDING_MODES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
-    bool addCharacteristic(btCharacteristic* bt);
     bool begin(unsigned long baudrate);
+    bool doAddCharacteristic(btCharacteristic* bt);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool doConnecting(const char* remoteBtAddress);
     bool doDisconnect();
@@ -48,10 +48,12 @@ public:
     bool doReboot(unsigned long baudrate);
     bool doStopConnecting();
     bool doRemoveBond();
+    bool doRemovePrivateCharacteristics();
+    bool doWriteRemoteCharacteristic(word handle, const byte *array, byte length);
     bool getBluetoothDeviceName(char* btName);
     bool getMacAddress(byte* array, byte& length);
+    word getRemoteHandle(const char* service, const char* characteristic);
     void loop();
-    bool removePrivateCharacteristics();
     void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool setBluetoothDeviceName(const char* btName);
     void setBondingListener(void (*ftBonding)(BONDING_MODES bd));

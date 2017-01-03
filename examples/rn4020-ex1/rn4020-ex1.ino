@@ -44,6 +44,7 @@ void setup() {
         return;
     }
     secureConnect();
+    ble.writeServiceCharacteristic(bleControl::BLE_S_IMMEDIATE_ALERT_SERVICE, bleControl::BLE_CH_ALERT_LEVEL,1);
     delay(5000);
     ble.disconnect();
     delay(5000);

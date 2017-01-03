@@ -57,7 +57,7 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     ble2_hal_init();
 }
 
-bool rn4020::addCharacteristic(btCharacteristic* bt)
+bool rn4020::doAddCharacteristic(btCharacteristic* bt)
 {
     if(bt->getHandle())
     {
@@ -251,6 +251,23 @@ bool rn4020::doStopConnecting()
     return waitForReply(2000,"AOK\r\n");
 }
 
+bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte length)
+{
+    char* hexString=(char*)malloc((length<<1)+1);
+    if(!hexString)
+    {
+        return false;
+    }
+    for(byte i=0;i<length;i++)
+    {
+        sprintf(hexString+(i<<1),"%02X", array[i]);
+    }
+    hexString[length<<1]='\0';
+    ble2_write_characteristic_content(handle, hexString);
+    return waitForReply(2000,"AOK\r\n");
+}
+
+
 bool rn4020::getBluetoothDeviceName(char* btName)
 {
     if(!btName)
@@ -301,6 +318,63 @@ bool rn4020::getMacAddress(byte* array, byte& length)
         pch = strtok (NULL, "\r\n");
     }
 }
+
+word rn4020::getRemoteHandle(const char* service, const char* characteristic)
+{
+    char* pch;
+    byte state=0;
+    byte ctr=0;
+
+    //Get list of services
+    ble2_list_client_services();
+    if(!waitForReply(5000, "END\r\n"))
+    {
+        return 0;
+    }
+    //Parse response line by line
+    pch = strtok (rxbuf,"\r\n");
+    do
+    {
+        switch(state)
+        {
+        case 0:
+            //Check if the line contains a service
+            if(strstr(pch,service))
+            {
+                //Service found, now looking for line with characteristic
+                state=1;
+                break;
+            }
+            break;
+        case 1:
+            if(strncmp(pch,"  ",2))
+            {
+                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
+                return 0;
+            }
+            if(strstr(pch, characteristic))
+            {
+                //Characteristic found, now looking for handle
+                char* pch2=strchr(pch,',')+1;
+                word handle;
+                if(sscanf(pch2, "%x,", &handle)==1)
+                {
+                    //#if DEBUG_LEVEL >= DEBUG_ALL
+                    //                    sPortDebug->println("Setting handle");
+                    //                    sPortDebug->println(handle, HEX);
+                    //#endif
+                   return handle;
+
+                }
+                state=0;
+                break;
+            }
+        }
+        pch = strtok (NULL, "\r\n");
+    }while (pch != NULL);
+    return 0;
+}
+
 
 bool rn4020::gotLine()
 {
@@ -487,7 +561,7 @@ bool rn4020::parseAdvertisement(char* buffer)
     return true;
 }
 
-bool rn4020::removePrivateCharacteristics()
+bool rn4020::doRemovePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
     return waitForReply(2000,"AOK");

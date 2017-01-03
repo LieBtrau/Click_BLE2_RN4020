@@ -7,11 +7,11 @@ class btCharacteristic
 public:
     typedef enum
     {
-        INDICATE=0x20,
-        NOTIFY=0x10,
-        WRITE=0x08,
-        WRITE_WOUT_RESP=0x04,
-        READ=0x02
+        INDICATE=0x20,          //like notify, but with acknowledgements (server doesn't need to do polling READs)
+        NOTIFY=0x10,            //client will get notifications when server (locally) changes the value (server doesn't need to do polling READs)
+        WRITE=0x08,             //client writes value and gets acknowledgements
+        WRITE_WOUT_RESP=0x04,   //client writes value and doesn't get acknowledgements
+        READ=0x02               //client can read the value
     }PROPERTY_FLAGS;
     typedef enum
     {

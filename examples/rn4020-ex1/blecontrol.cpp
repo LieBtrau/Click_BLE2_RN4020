@@ -137,7 +137,7 @@ bool bleControl::begin(bool bCentral)
             {
                 return false;
             }
-            if(!rn.removePrivateCharacteristics())
+            if(!rn.doRemovePrivateCharacteristics())
             {
                 return false;
             }
@@ -146,12 +146,12 @@ bool bleControl::begin(bool bCentral)
             {
                 return false;
             }
-            if(!rn.addCharacteristic(&rfid_key))
+            if(!rn.doAddCharacteristic(&rfid_key))
             {
                 return false;
             }
             ias_alertLevel.setListener(alertLevelEvent);
-            if(!rn.addCharacteristic(&ias_alertLevel))
+            if(!rn.doAddCharacteristic(&ias_alertLevel))
             {
                 return false;
             }
@@ -278,6 +278,38 @@ unsigned long bleControl::getPasscode()
     return pass;
 }
 
+bool bleControl::writeServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTICS chr, byte value)
+{
+    char services[1][5]={"1802"};
+    char characteristics[1][5]={"2A06"};
+    char* servptr, *chrptr;
+    word handle;
+
+    switch(serv)
+    {
+    case BLE_S_IMMEDIATE_ALERT_SERVICE:
+        servptr=services[0];
+        break;
+    default:
+        return false;
+    }
+    switch(chr)
+    {
+    case BLE_CH_ALERT_LEVEL:
+        chrptr=characteristics[0];
+        break;
+    default:
+        return false;
+    }
+
+    handle=rn.getRemoteHandle(servptr,chrptr);
+    if(!handle)
+    {
+        return false;
+    }
+
+    return rn.doWriteRemoteCharacteristic(handle,&value,1);
+}
 
 bool bleControl::getLocalMacAddress(byte* address, byte& length)
 {
