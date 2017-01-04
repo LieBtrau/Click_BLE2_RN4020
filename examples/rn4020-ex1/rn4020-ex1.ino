@@ -43,7 +43,10 @@ void setup() {
         sw->println("Remote peer not found");
         return;
     }
-    secureConnect();
+    if(!secureConnect())
+    {
+        return;
+    }
 
     //Example of writing a characteristic
     ble.writeServiceCharacteristic(bleControl::BLE_S_IMMEDIATE_ALERT_SERVICE, bleControl::BLE_CH_ALERT_LEVEL,1);
@@ -60,14 +63,17 @@ void setup() {
     delay(5000);
     ble.disconnect();
     delay(5000);
-    secureConnect();
+    if(!secureConnect())
+    {
+        return;
+    }
 }
 
 void loop() {
     ble.loop();
 }
 
-void secureConnect()
+bool secureConnect()
 {
     sw->println("Trying secure connect");
     bleControl::CONNECT_STATE state=bleControl::ST_NOTCONNECTED;
@@ -87,4 +93,5 @@ void secureConnect()
             break;
         }
     }while(state!=bleControl::ST_NOTCONNECTED && state!=bleControl::ST_BONDED);
+    return state==bleControl::ST_BONDED;
 }
