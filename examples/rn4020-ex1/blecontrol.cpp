@@ -65,7 +65,7 @@ bool bleControl::begin(bool bCentral)
 {
     char dataname[20];
     const char BT_NAME_KEYFOB[]="AiakosKeyFob";
-    const char BT_NAME_BIKE[]="AiakosBik2";
+    const char BT_NAME_BIKE[]="AiakosBike";
 
     bIsCentral=bCentral;
     //Switch to 2400baud
@@ -91,13 +91,13 @@ bool bleControl::begin(bool bCentral)
             //Module not yet correctly configured
 
             //Services: Device Information + Battery Level services
-            if(!rn.setServices(0xC0000000))
+            if(!rn.setServices(SRV_BATTERY | SRV_DEVICE_INFO))
             {
                 return false;
             }
             //Central role
             //Enable authentication with Keyboard and display as IO-capabilities
-            if(!rn.setFeatures(0x80480000))
+            if(!rn.setFeatures(FR_CENTRAL | FR_AUTH_KEYB_DISP))
             {
                 return false;
             }
@@ -124,12 +124,12 @@ bool bleControl::begin(bool bCentral)
 
             //Enable authentication with Keyboard and display as IO-capabilities
             //Server only (services will only be served, no client functionalities)
-            if(!rn.setFeatures(0x00482000))
+            if(!rn.setFeatures(FR_AUTH_KEYB_DISP | FR_SERV_ONLY))
             {
                 return false;
             }
             //Services: Device Information + Battery Level + user defined private services
-            if(!rn.setServices(0xC0000001))
+            if(!rn.setServices(SRV_BATTERY | SRV_DEVICE_INFO | SRV_USR_PRIV_SERV))
             {
                 return false;
             }

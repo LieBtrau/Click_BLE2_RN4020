@@ -23,6 +23,18 @@ public:
         BLE_CH_ALERT_LEVEL,             //2A06
         BLE_CH_SERIAL_NUMBER_STRING     //2A25
     }BLE_CHARACTERISTICS;
+    typedef enum
+    {
+        FR_CENTRAL=0x80000000,
+        FR_AUTH_KEYB_DISP=0x00480000,
+        FR_SERV_ONLY=0x00002000
+    }FEATURES;
+    typedef enum    //Starting from FW-version 1.33BEC, only these two services are supported.  Other ones must be created by the user.
+    {
+        SRV_DEVICE_INFO=0x80000000,
+        SRV_BATTERY=0x40000000,
+        SRV_USR_PRIV_SERV=0x00000001
+    }SERVICES;
     bleControl();
     bool begin(bool bCentral);
     bool loop(void);
