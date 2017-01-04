@@ -511,7 +511,7 @@ void ble2_write_characteristic_configuration_via_UUID(char* UUID, configuration_
  * @param content
  * hexadecimal value of the contents to be written.
  */
-void ble2_write_characteristic_content_via_UUID(char* UUID, char* content);
+void ble2_write_characteristic_content_via_UUID(const char* UUID, const char* content);
 /**
  * @brief
  * Reads the contents of the characteristic of the server service on a local device by addressing its handle.

@@ -57,7 +57,7 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     ble2_hal_init();
 }
 
-bool rn4020::addCharacteristic(btCharacteristic* bt)
+bool rn4020::doAddCharacteristic(btCharacteristic* bt)
 {
     if(bt->getHandle())
     {
@@ -96,7 +96,7 @@ bool rn4020::addCharacteristic(btCharacteristic* bt)
     return true;
 }
 
-bool rn4020::begin(unsigned long baudrate, ROLES role)
+bool rn4020::begin(unsigned long baudrate)
 {
     pinMode(_pinEnPwr, OUTPUT);
     pinMode(_pinWake_hw_15, OUTPUT);
@@ -121,39 +121,10 @@ bool rn4020::begin(unsigned long baudrate, ROLES role)
             return false;
         }
     }
-    //Set module parameters
-    switch(role)
-    {
-    case RL_PERIPHERAL:
-        //Services: Device Information + Battery Level + user defined private services enabled
-        ble2_set_server_services(0xC0000001);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-        //Enable authentication with Keyboard and display as IO-capabilities
-        //Server only (services will only be served, no client functionalities)
-        ble2_set_supported_features(0x00482000);
-        break;
-    case RL_CENTRAL:
-        //Services: Device Information + Battery Level services enabled
-        //ble2_set_server_services(0xC0480000);
-        ble2_set_server_services(0xC0000000);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-        //Central role
-        ble2_set_supported_features(0x80000000);
-        break;
-    default:
-        return false;
-    }
-    _role=role;
-    return waitForReply(2000,"AOK");
+    return true;
 }
 
-word rn4020::countChars(char* buf, char findc)
+word rn4020::getNrOfOccurrence(char* buf, char findc)
 {
     char* pch=buf;
     word ctr=0;
@@ -197,15 +168,16 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
 
 bool rn4020::doConnecting(const char* remoteBtAddress)
 {
-    if(_role!=RL_CENTRAL)
-    {
-        return false;
-    }
     if(ble2_start_connection(PUBLIC_ADDRESS, remoteBtAddress)!=0)
     {
         return false;
     }
-    return waitForReply(10000,"AOK\r\n");
+    if(!waitForReply(10000,"AOK\r\n"))
+    {
+        return false;
+    }
+    ble2_get_connection_status();
+    return waitForReply(2000,"Connected");
 }
 
 bool rn4020::doDisconnect()
@@ -267,6 +239,52 @@ bool rn4020::doReboot(unsigned long baudrate)
     return waitForStartup(baudrate);
 }
 
+bool rn4020::doRemoveBond()
+{
+    ble2_remove_bonding();
+    return waitForReply(2000,"AOK\r\n");
+}
+
+bool rn4020::doStopConnecting()
+{
+    ble2_stop_connection_process();
+    return waitForReply(2000,"AOK\r\n");
+}
+
+bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
+{
+    char hexarray[41];//maximum data length=20 bytes
+    ble2_read_characteristic_content(handle);
+    if(!waitForNrOfLines(2000,1))
+    {
+        return false;
+    }
+    if(sscanf(rxbuf, "R,%40s.", hexarray)!=1)
+    {
+        return false;
+    }
+    hex2array(hexarray, array, length);
+    return true;
+}
+
+
+bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte length)
+{
+    char* hexString=(char*)malloc((length<<1)+1);
+    if(!hexString)
+    {
+        return false;
+    }
+    for(byte i=0;i<length;i++)
+    {
+        sprintf(hexString+(i<<1),"%02X", array[i]);
+    }
+    hexString[length<<1]='\0';
+    ble2_write_characteristic_content(handle, hexString);
+    return waitForReply(2000,"AOK\r\n");
+}
+
+
 bool rn4020::getBluetoothDeviceName(char* btName)
 {
     if(!btName)
@@ -274,7 +292,7 @@ bool rn4020::getBluetoothDeviceName(char* btName)
         return false;
     }
     ble2_display_critical_info();
-    if(!waitForLines(2000, 8))
+    if(!waitForNrOfLines(2000, 8))
     {
         return false;
     }
@@ -299,7 +317,7 @@ bool rn4020::getMacAddress(byte* array, byte& length)
     }
     char hexarray[12];
     ble2_display_critical_info();
-    if(!waitForLines(2000, 8))
+    if(!waitForNrOfLines(2000, 8))
     {
         return false;
     }
@@ -317,6 +335,63 @@ bool rn4020::getMacAddress(byte* array, byte& length)
         pch = strtok (NULL, "\r\n");
     }
 }
+
+word rn4020::getRemoteHandle(const char* service, const char* characteristic)
+{
+    char* pch;
+    byte state=0;
+    byte ctr=0;
+
+    //Get list of services
+    ble2_list_client_services();
+    if(!waitForReply(5000, "END\r\n"))
+    {
+        return 0;
+    }
+    //Parse response line by line
+    pch = strtok (rxbuf,"\r\n");
+    do
+    {
+        switch(state)
+        {
+        case 0:
+            //Check if the line contains a service
+            if(strstr(pch,service))
+            {
+                //Service found, now looking for line with characteristic
+                state=1;
+                break;
+            }
+            break;
+        case 1:
+            if(strncmp(pch,"  ",2))
+            {
+                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
+                return 0;
+            }
+            if(strstr(pch, characteristic))
+            {
+                //Characteristic found, now looking for handle
+                char* pch2=strchr(pch,',')+1;
+                word handle;
+                if(sscanf(pch2, "%x,", &handle)==1)
+                {
+                    //#if DEBUG_LEVEL >= DEBUG_ALL
+                    //                    sPortDebug->println("Setting handle");
+                    //                    sPortDebug->println(handle, HEX);
+                    //#endif
+                    return handle;
+
+                }
+                state=0;
+                break;
+            }
+        }
+        pch = strtok (NULL, "\r\n");
+    }while (pch != NULL);
+    return 0;
+}
+
 
 bool rn4020::gotLine()
 {
@@ -503,7 +578,7 @@ bool rn4020::parseAdvertisement(char* buffer)
     return true;
 }
 
-bool rn4020::removePrivateCharacteristics()
+bool rn4020::doRemovePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
     return waitForReply(2000,"AOK");
@@ -577,6 +652,13 @@ void rn4020::setConnectionListener(void (*ftConnection)(bool))
     _ftConnectionStateChanged=ftConnection;
 }
 
+bool rn4020::setFeatures(uint32_t features)
+{
+    ble2_set_supported_features(features);
+    return waitForReply(2000,"AOK");
+}
+
+
 //http://microchip.wikidot.com/ble:rn4020-power-states
 bool rn4020::setOperatingMode(OPERATING_MODES om)
 {
@@ -613,6 +695,12 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
     }
 }
 
+bool rn4020::setServices(uint32_t services)
+{
+    ble2_set_server_services(services);
+    return waitForReply(2000,"AOK");
+}
+
 bool rn4020::setTxPower(byte pwr)
 {
     if(pwr>7)
@@ -625,10 +713,6 @@ bool rn4020::setTxPower(byte pwr)
 
 bool rn4020::startBonding()
 {
-    if(_role!=RL_CENTRAL)
-    {
-        return false;
-    }
     ble2_bond(SAVED);
     return waitForReply(2000,"AOK\r\n");
 }
@@ -695,14 +779,14 @@ void rn4020::updateHandles()
     }while (pch != NULL);
 }
 
-bool rn4020::waitForLines(unsigned long ulTimeout, byte nrOfEols)
+word rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 {
     unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+ulTimeout && countChars(rxbuf,'\n')<nrOfEols)
+    while(millis()<ulStartTime+ulTimeout && getNrOfOccurrence(rxbuf,'\n')<nrOfEols)
     {
         gotLine();
     }
-    return countChars(rxbuf,'\n');
+    return getNrOfOccurrence(rxbuf,'\n');
 }
 
 //Read multiple lines and search for pattern
@@ -727,6 +811,8 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
 
 bool rn4020::waitForStartup(unsigned long baudrate)
 {
+    delay(100);//give serial port time to send its last characters
+    sPort->flush();//on Nucleo, flush() simply clears buffers, it doesn't wait for TX-ing to finish.
     sPort->end();
     sPort->begin(baudrate);
     //After power up, it takes about 1.28s for the RN4020 to become active

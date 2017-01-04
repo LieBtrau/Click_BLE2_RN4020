@@ -534,7 +534,7 @@ void ble2_write_characteristic_configuration_via_UUID(char* UUID, configuration_
     ble2_hal_send(tmp);
 }
 
-void  ble2_write_characteristic_content_via_UUID(char* UUID, char* content)
+void  ble2_write_characteristic_content_via_UUID(const char* UUID, const char* content)
 {
     char tmp[53] = {0};
 
