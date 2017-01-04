@@ -199,7 +199,7 @@ bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
     }
     //Polling loop
     unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+6000)
+    while(millis()<ulStartTime+10000)
     {
         loop();
         if(!strcmp(remoteBtAddress, (char*)foundBtAddress))

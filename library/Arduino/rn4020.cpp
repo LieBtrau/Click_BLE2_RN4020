@@ -172,12 +172,11 @@ bool rn4020::doConnecting(const char* remoteBtAddress)
     {
         return false;
     }
-    if(!waitForReply(10000,"AOK\r\n"))
+    if(!waitForReply(10000,"AOK\r\n"))  //AOK doesn't mean connection is established
     {
         return false;
     }
-    ble2_get_connection_status();
-    return waitForReply(2000,"Connected");
+    return waitForReply(10000,"Connected");
 }
 
 bool rn4020::doDisconnect()
