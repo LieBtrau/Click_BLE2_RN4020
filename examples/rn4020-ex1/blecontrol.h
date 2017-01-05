@@ -29,6 +29,13 @@ public:
         FR_AUTH_KEYB_DISP=0x00480000,
         FR_SERV_ONLY=0x00002000
     }FEATURES;
+    typedef enum
+    {
+        EV_PASSCODE_WANTED,
+        EV_CONNECTION_UP,
+        EV_CONNECTION_DOWN,
+        EV_CHARACTERISTIC_VALUE_CHANGED
+    }EVENT;
     typedef enum    //Starting from FW-version 1.33BEC, only these two services are supported.  Other ones must be created by the user.
     {
         SRV_DEVICE_INFO=0x80000000,
@@ -39,6 +46,8 @@ public:
     bool begin(bool bCentral);
     bool loop(void);
     bool getLocalMacAddress(byte* address, byte& length);
+    void setEventListener(void(*ftEventReceived)(EVENT));
+    void setPasscode(unsigned long pass);
     bool findUnboundPeripheral(const char *remoteBtAddress);
     CONNECT_STATE secureConnect(const char* remoteBtAddress, CONNECT_STATE state);
     unsigned long getPasscode();

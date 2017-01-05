@@ -69,14 +69,14 @@ bool rn4020::doAddCharacteristic(btCharacteristic* bt)
         //Service not created in previous call.  Create it now.
         strcpy(_lastCreatedService, bt->getUuidService());
         ble2_set_private_service_uuid(_lastCreatedService);
-        if(!waitForReply(2000,"AOK"))
+        if(!waitForReply(2000,"AOK\r\n"))
         {
             return false;
         }
     }
     //Set characteristics of the created service:
     ble2_set_private_characteristics(bt->getUuidCharacteristic(),bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
-    if(!waitForReply(2000,"AOK"))
+    if(!waitForReply(2000,"AOK\r\n"))
     {
         return false;
     }
@@ -163,7 +163,7 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
         //Stop
         ble2_stop_advertising();
     }
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 bool rn4020::doConnecting(const char* remoteBtAddress)
@@ -534,6 +534,12 @@ void rn4020::loop()
 #if DEBUG_LEVEL >= DEBUG_ALL
         sPortDebug->print("Unknown input: ");
         sPortDebug->println(rxbuf);
+        byte i=0;
+        while(rxbuf[i])
+        {
+            sPortDebug->print(rxbuf[i++], HEX);
+            sPortDebug->print(" ");
+        }
 #endif
     }
 }
@@ -581,7 +587,7 @@ bool rn4020::parseAdvertisement(char* buffer)
 bool rn4020::doRemovePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 void rn4020::setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*))
@@ -623,13 +629,13 @@ bool rn4020::setBaudrate(unsigned long baud)
 #endif
         return false;
     }
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 bool rn4020::setBluetoothDeviceName(const char* btName)
 {
     ble2_set_device_bluetooth_name(btName);
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 void rn4020::setBondingListener(void (*ftBonding)(BONDING_MODES bd))
@@ -642,7 +648,7 @@ void rn4020::setBondingPasscodeListener(void (*ftPasscode)(unsigned long))
     _ftPasscodeGenerated=ftPasscode;
 }
 
-void rn4020::setBondingPasscode(const char* passcode)
+void rn4020::setBondingPasscode(unsigned long passcode)
 {
     ble2_set_passcode(passcode);
 }
@@ -655,7 +661,7 @@ void rn4020::setConnectionListener(void (*ftConnection)(bool))
 bool rn4020::setFeatures(uint32_t features)
 {
     ble2_set_supported_features(features);
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 
@@ -698,7 +704,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
 bool rn4020::setServices(uint32_t services)
 {
     ble2_set_server_services(services);
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 bool rn4020::setTxPower(byte pwr)
@@ -708,7 +714,7 @@ bool rn4020::setTxPower(byte pwr)
         return false;
     }
     ble2_set_transmission_power((tx_pwr_t)pwr);
-    return waitForReply(2000,"AOK");
+    return waitForReply(2000,"AOK\r\n");
 }
 
 bool rn4020::startBonding()

@@ -293,9 +293,12 @@ void ble2_bond(bond_saving_t parameter)
     ble2_hal_send(tmp);
 }
 
-void ble2_set_passcode(const char* passcode)
+void ble2_set_passcode(unsigned long passcode)
 {
-    ble2_hal_send(passcode);
+    const int n = snprintf(NULL, 0, "%lu", passcode);
+    char buf[n+1];
+    snprintf(buf, n+1, "%lu", passcode);
+    ble2_hal_send(buf);
 }
 
 void ble2_display_critical_info()

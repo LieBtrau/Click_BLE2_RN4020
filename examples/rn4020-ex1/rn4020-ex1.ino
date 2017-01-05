@@ -24,6 +24,7 @@ HardwareSerial* sw=&Serial;
 
 
 uint32_t ulStartTime;
+bool bConnected;
 
 bleControl ble;
 
@@ -34,6 +35,7 @@ void setup() {
     sw->println("I'm ready, folk!");
     bool modeIsCentral=false;
     char peripheralMac[]="001EC01D03EA";
+    ble.setEventListener(bleEvent);
 
     if(!ble.begin(modeIsCentral))
     {
@@ -93,4 +95,27 @@ void secureConnect(char* peripheralMac)
             break;
         }
     }while(state!=bleControl::ST_NOTCONNECTED && state!=bleControl::ST_BONDED);
+}
+
+void bleEvent(bleControl::EVENT ev)
+{
+    switch(ev)
+    {
+    case bleControl::EV_PASSCODE_WANTED:
+        sw->println("Let's guess that the passcode is 123456");
+        ble.setPasscode(123456);
+        break;
+    case bleControl::EV_CONNECTION_DOWN:
+        sw->println("Connection down");
+        bConnected=false;
+        break;
+    case bleControl::EV_CONNECTION_UP:
+        sw->println("Connection up");
+        bConnected=true;
+        break;
+    default:
+        sw->print("Unknown event: ");
+        sw->println(ev, DEC);
+        break;
+    }
 }

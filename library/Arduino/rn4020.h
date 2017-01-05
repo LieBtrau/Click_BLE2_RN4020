@@ -59,7 +59,7 @@ public:
     bool setBluetoothDeviceName(const char* btName);
     void setBondingListener(void (*ftBonding)(BONDING_MODES bd));
     void setBondingPasscodeListener(void (*ftPasscode)(unsigned long));
-    void setBondingPasscode(const char* passcode);
+    void setBondingPasscode(unsigned long passcode);
     void setConnectionListener(void (*ftConnection)(bool));
     bool setFeatures(uint32_t features);
     bool setOperatingMode(OPERATING_MODES om);

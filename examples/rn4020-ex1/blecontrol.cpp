@@ -2,6 +2,8 @@
 #include "rn4020.h"
 #include "btcharacteristic.h"
 
+#define DEBUG_LEVEL DEBUG_ALL
+
 #if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
 #include <SoftwareSerial.h>
 extern SoftwareSerial* sw;
@@ -37,10 +39,12 @@ static void alertLevelEvent(char* value, byte& length);
 static void bondingEvent(rn4020::BONDING_MODES bd);
 static void advertisementEvent(rn4020::ADVERTISEMENT* adv);
 static void passcodeGeneratedEvent(unsigned long passcode);
+
 static unsigned long pass;
 static volatile bool bPassReady=false;
 static volatile bool bIsBonded;
 static bool bIsCentral;
+static void (*generateEvent)(bleControl::EVENT);
 
 //https://www.bluetooth.com/specifications/gatt/services
 //https://www.bluetooth.com/specifications/gatt/characteristics
@@ -58,6 +62,7 @@ static volatile char* foundBtAddress=0;
 bleControl::bleControl()
 {
     bIsBonded=false;
+    generateEvent=0;
 }
 
 //Set up the RN4020 module
@@ -278,6 +283,11 @@ unsigned long bleControl::getPasscode()
     return pass;
 }
 
+void bleControl::setPasscode(unsigned long pass)
+{
+    rn.setBondingPasscode(pass);
+}
+
 bool bleControl::writeServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTICS chr, byte value)
 {
     word handle=getRemoteHandle(serv,chr);
@@ -339,6 +349,12 @@ word bleControl::getRemoteHandle(BLE_SERVICES serv, BLE_CHARACTERISTICS chr)
     return rn.getRemoteHandle(servptr,chrptr);
 }
 
+void bleControl::setEventListener(void(*ftEventReceived)(EVENT))
+{
+    generateEvent=ftEventReceived;
+}
+
+
 void advertisementEvent(rn4020::ADVERTISEMENT* adv)
 {
     foundBtAddress=(char*)malloc(strlen(adv->btAddress)+1);
@@ -351,12 +367,19 @@ void advertisementEvent(rn4020::ADVERTISEMENT* adv)
 
 void alertLevelEvent(char* value, byte &length)
 {
+    if(generateEvent)
+    {
+    generateEvent(bleControl::EV_CHARACTERISTIC_VALUE_CHANGED);
+    }
+#if DEBUG_LEVEL >= DEBUG_ALL
+    sw->print("Characteristic changed to: ");
     for(byte i=0;i<length;i++)
     {
         sw->print(value[i], HEX);
         sw->print(" ");
     }
     sw->println();
+#endif
 }
 
 void bondingEvent(rn4020::BONDING_MODES bd)
@@ -367,7 +390,10 @@ void bondingEvent(rn4020::BONDING_MODES bd)
         bIsBonded=true;
         break;
     case rn4020::BD_PASSCODE_NEEDED:
-        rn.setBondingPasscode("123456");
+        if(generateEvent)
+        {
+            generateEvent(bleControl::EV_PASSCODE_WANTED);
+        }
         break;
     default:
         break;
@@ -378,10 +404,16 @@ void connectionEvent(bool bConnectionUp)
 {
     if(bConnectionUp)
     {
-        sw->println("up");
+        if(generateEvent)
+        {
+            generateEvent(bleControl::EV_CONNECTION_UP);
+        }
     }else
     {
-        sw->println("down");
+        if(generateEvent)
+        {
+            generateEvent(bleControl::EV_CONNECTION_DOWN);
+        }
         if(!bIsCentral)
         {
             //After connection goes down, advertizing must be restarted or the module will no longer be connectable.
