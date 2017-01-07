@@ -44,7 +44,7 @@ byte btCharacteristic::getSecurityBmp()
     return _securityBmp;
 }
 
-void btCharacteristic::setListener(void (*ftListener)(char*, byte&))
+void btCharacteristic::setListener(void (*ftListener)(byte*, byte&))
 {
     _ftListener=ftListener;
 }
@@ -55,7 +55,7 @@ void btCharacteristic::setHandle(word handle)
 }
 
 
-void btCharacteristic::callListener(char* data, byte& length)
+void btCharacteristic::callListener(byte *data, byte& length)
 {
     if(!_ftListener)
     {

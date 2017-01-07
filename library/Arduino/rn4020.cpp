@@ -46,54 +46,27 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _pinEnPwr(pinEnPwr),
     _pinActive_12(pinBtActive),
     _ftConnectionStateChanged(0),
-    _characteristicCount(0),
     _ftAdvertisementReceived(0),
     _ftBondingEvent(0),
+    _ftCharacteristicWritten(0),
     _ftPasscodeGenerated(0)
 {
     sPort=&s;
     sPortDebug=sw;
-    memset(_lastCreatedService,'\0',sizeof(_lastCreatedService));
     ble2_hal_init();
 }
 
 bool rn4020::doAddCharacteristic(btCharacteristic* bt)
 {
-    if(bt->getHandle())
-    {
-        //handle already exists
-        return true;
-    }
-    if(strcmp(_lastCreatedService, bt->getUuidService()))
-    {
-        //Service not created in previous call.  Create it now.
-        strcpy(_lastCreatedService, bt->getUuidService());
-        ble2_set_private_service_uuid(_lastCreatedService);
-        if(!waitForReply(2000,"AOK"))
-        {
-            return false;
-        }
-    }
     //Set characteristics of the created service:
     ble2_set_private_characteristics(bt->getUuidCharacteristic(),bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
-    if(!waitForReply(2000,"AOK"))
-    {
-        return false;
-    }
-    //Created characteristics only become available after reboot.
-    if(!doReboot(2400))
-    {
-        return false;
-    }
-    _characteristicList = (btCharacteristic**) realloc(_characteristicList, (_characteristicCount + 1) * sizeof(btCharacteristic*));
-    if(!_characteristicList)
-    {
-        return false;
-    }
-    _characteristicList[_characteristicCount++]=bt;
-    //Get the handle of the characteristic
-    updateHandles();
-    return true;
+    return waitForReply(2000,"AOK");
+}
+
+bool rn4020::doAddService(btCharacteristic* bt)
+{
+    ble2_set_private_service_uuid(bt->getUuidService());
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::begin(unsigned long baudrate)
@@ -265,6 +238,69 @@ bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
     }
     hex2array(hexarray, array, length);
     return true;
+}
+
+
+/* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
+ * change.  This function updates those handles.
+ */
+void rn4020::doUpdateHandles(btCharacteristic** characteristicList, byte count)
+{
+    char* pch;
+    byte state=0;
+    byte ctr=0;
+
+    //Get list of services
+    ble2_list_server_services();
+    if(!waitForReply(2000, "END"))
+    {
+        return;
+    }
+    //Parse response line by line
+    pch = strtok (rxbuf,"\r\n");
+    do
+    {
+        switch(state)
+        {
+        case 0:
+            //Check if the line contains a service
+            for(ctr=0;ctr<count;ctr++)
+            {
+                //Nothing found yet, split string in lines;
+                if(strstr(pch,characteristicList[ctr]->getUuidService()))
+                {
+                    //Service found, now looking for line with characteristic
+                    state=1;
+                    break;
+                }
+            }
+            break;
+        case 1:
+            if(strncmp(pch,"  ",2))
+            {
+                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
+                return;
+            }
+            if(strstr(pch, characteristicList[ctr]->getUuidCharacteristic()))
+            {
+                //Characteristic found, now looking for handle
+                char* pch2=strchr(pch,',')+1;
+                word handle;
+                if(sscanf(pch2, "%x,", &handle)==1)
+                {
+                    //#if DEBUG_LEVEL >= DEBUG_ALL
+                    //                    sPortDebug->println("Setting handle");
+                    //                    sPortDebug->println(handle, HEX);
+                    //#endif
+                    characteristicList[ctr]->setHandle(handle);
+
+                }
+                state=0;
+                break;
+            }
+        }
+        pch = strtok (NULL, "\r\n");
+    }while (pch != NULL);
 }
 
 
@@ -500,20 +536,11 @@ void rn4020::loop()
         _ftConnectionStateChanged(false);
         return;
     }
-    if(sscanf(rxbuf, "WV,%04x,%32s ", &handle,value)==2)
+    if(sscanf(rxbuf, "WV,%04x,%32s ", &handle,value)==2 && _ftCharacteristicWritten)
     {
-        //look up the matching characteristic in our local list
-        for(byte i=0;i<_characteristicCount;i++)
-        {
-            if(_characteristicList[i]->getHandle()==handle)
-            {
-                //Local server characteristic has been written by remote client
-                length=_characteristicList[i]->getValueLength();
-                hex2array(value, (byte*)value, length);
-                //Call the event handler attached to this characteristic
-                _characteristicList[i]->callListener(value, length);
-            }
-        }
+        byte array[17];
+        hex2array(value, array, length);
+        _ftCharacteristicWritten(handle, array, length);
         return;
     }
     if(sscanf(rxbuf, "Peer Passcode:%d",&passcode)==1 && _ftPasscodeGenerated)
@@ -613,6 +640,11 @@ void rn4020::setBondingPasscode(unsigned long passcode)
     ble2_set_passcode(passcode);
 }
 
+void rn4020::setCharacteristicWrittenListener(void(*ftCharacteristicWritten)(word, byte*, byte))
+{
+    _ftCharacteristicWritten=ftCharacteristicWritten;
+}
+
 void rn4020::setConnectionListener(void (*ftConnection)(bool))
 {
     _ftConnectionStateChanged=ftConnection;
@@ -642,7 +674,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         digitalWrite(_pinWake_sw_7, LOW);
         if(bInNormalMode)
         {
-            bSuccess=waitForReply(1000,"END");
+            bSuccess=waitForReply(1000,"END\r\n");
         }
         digitalWrite(_pinWake_hw_15, HIGH);
         delay(10);
@@ -683,67 +715,6 @@ bool rn4020::startBonding()
     return waitForReply(2000,"AOK");
 }
 
-/* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
- * change.  This function updates those handles.
- */
-void rn4020::updateHandles()
-{
-    char* pch;
-    byte state=0;
-    byte ctr=0;
-
-    //Get list of services
-    ble2_list_server_services();
-    if(!waitForReply(2000, "END"))
-    {
-        return;
-    }
-    //Parse response line by line
-    pch = strtok (rxbuf,"\r\n");
-    do
-    {
-        switch(state)
-        {
-        case 0:
-            //Check if the line contains a service
-            for(ctr=0;ctr<_characteristicCount;ctr++)
-            {
-                //Nothing found yet, split string in lines;
-                if(strstr(pch,_characteristicList[ctr]->getUuidService()))
-                {
-                    //Service found, now looking for line with characteristic
-                    state=1;
-                    break;
-                }
-            }
-            break;
-        case 1:
-            if(strncmp(pch,"  ",2))
-            {
-                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
-                return;
-            }
-            if(strstr(pch, _characteristicList[ctr]->getUuidCharacteristic()))
-            {
-                //Characteristic found, now looking for handle
-                char* pch2=strchr(pch,',')+1;
-                word handle;
-                if(sscanf(pch2, "%x,", &handle)==1)
-                {
-                    //#if DEBUG_LEVEL >= DEBUG_ALL
-                    //                    sPortDebug->println("Setting handle");
-                    //                    sPortDebug->println(handle, HEX);
-                    //#endif
-                    _characteristicList[ctr]->setHandle(handle);
-
-                }
-                state=0;
-                break;
-            }
-        }
-        pch = strtok (NULL, "\r\n");
-    }while (pch != NULL);
-}
 
 word rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 {
