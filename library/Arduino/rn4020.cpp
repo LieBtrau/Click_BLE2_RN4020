@@ -69,14 +69,14 @@ bool rn4020::doAddCharacteristic(btCharacteristic* bt)
         //Service not created in previous call.  Create it now.
         strcpy(_lastCreatedService, bt->getUuidService());
         ble2_set_private_service_uuid(_lastCreatedService);
-        if(!waitForReply(2000,"AOK\r\n"))
+        if(!waitForReply(2000,"AOK"))
         {
             return false;
         }
     }
     //Set characteristics of the created service:
     ble2_set_private_characteristics(bt->getUuidCharacteristic(),bt->getProperty(),bt->getValueLength(), bt->getSecurityBmp());
-    if(!waitForReply(2000,"AOK\r\n"))
+    if(!waitForReply(2000,"AOK"))
     {
         return false;
     }
@@ -163,7 +163,7 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
         //Stop
         ble2_stop_advertising();
     }
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::doConnecting(const char* remoteBtAddress)
@@ -172,7 +172,7 @@ bool rn4020::doConnecting(const char* remoteBtAddress)
     {
         return false;
     }
-    if(!waitForReply(10000,"AOK\r\n"))
+    if(!waitForReply(10000,"AOK"))
     {
         return false;
     }
@@ -183,7 +183,7 @@ bool rn4020::doConnecting(const char* remoteBtAddress)
 bool rn4020::doDisconnect()
 {
     ble2_kill_active_connection();
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
@@ -228,7 +228,7 @@ bool rn4020::doFindRemoteDevices(bool bEnabled)
     {
         ble2_stop_inquiry_process();
     }
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::doReboot(unsigned long baudrate)
@@ -242,13 +242,13 @@ bool rn4020::doReboot(unsigned long baudrate)
 bool rn4020::doRemoveBond()
 {
     ble2_remove_bonding();
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::doStopConnecting()
 {
     ble2_stop_connection_process();
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
@@ -281,7 +281,7 @@ bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte le
     }
     hexString[length<<1]='\0';
     ble2_write_characteristic_content(handle, hexString);
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 
@@ -344,7 +344,7 @@ word rn4020::getRemoteHandle(const char* service, const char* characteristic)
 
     //Get list of services
     ble2_list_client_services();
-    if(!waitForReply(5000, "END\r\n"))
+    if(!waitForReply(5000, "END"))
     {
         return 0;
     }
@@ -470,7 +470,6 @@ bool rn4020::isModuleActive(unsigned long uiTimeout)
 
 void rn4020::loop()
 {
-    bool bEventHandled=false;
     word handle;
     byte length;
     char value[42];
@@ -478,30 +477,28 @@ void rn4020::loop()
     if(!strncmp(rxbuf, "Passcode:", 9) && _ftBondingEvent)
     {
         _ftBondingEvent(BD_PASSCODE_NEEDED);
-        bEventHandled=true;
         *rxbuf='\0';    //avoid future calls
-    }else
+        return;
+    }
+    if(!gotLine())
     {
-        if(!gotLine())
-        {
-            return;
-        }
+        return;
     }
     indexRxBuf=0;
     if(strstr(rxbuf, "Secured") && _ftBondingEvent)
     {
         _ftBondingEvent(BD_ESTABLISHED);
-        bEventHandled=true;
+        return;
     }
     if(strstr(rxbuf, "Connected") && _ftConnectionStateChanged)
     {
         _ftConnectionStateChanged(true);
-        bEventHandled=true;
+        return;
     }
     if(strstr(rxbuf, "Connection End") && _ftConnectionStateChanged)
     {
         _ftConnectionStateChanged(false);
-        bEventHandled=true;
+        return;
     }
     if(sscanf(rxbuf, "WV,%04x,%32s ", &handle,value)==2)
     {
@@ -517,77 +514,40 @@ void rn4020::loop()
                 _characteristicList[i]->callListener(value, length);
             }
         }
-        bEventHandled=true;
+        return;
     }
     if(sscanf(rxbuf, "Peer Passcode:%d",&passcode)==1 && _ftPasscodeGenerated)
     {
         _ftPasscodeGenerated(passcode);
-        bEventHandled=true;
+        return;
     }
-    if(parseAdvertisement(rxbuf))
-    {
-        bEventHandled=true;
-    }
-    if(!bEventHandled)
-    {
-        //If no matching string found
+    //If no matching string found
 #if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->print("Unknown input: ");
-        sPortDebug->println(rxbuf);
-        byte i=0;
-        while(rxbuf[i])
-        {
-            sPortDebug->print(rxbuf[i++], HEX);
-            sPortDebug->print(" ");
-        }
-#endif
+    sPortDebug->print("Unknown input: ");
+    sPortDebug->println(rxbuf);
+    byte i=0;
+    while(rxbuf[i])
+    {
+        sPortDebug->print(rxbuf[i++], HEX);
+        sPortDebug->print(" ");
     }
+#endif
 }
 
+//The format of the scan result is:
+//<BTADDR>    ,<PRIVATE>,<BTName>      ,<UUID>                          ,<RSSI>
+//-----------------------------------------------------------------------------
+//001EC01CFD32,0        ,              ,F1A879125950479CA5E5B6CC81CD0502,-41
+//001EC01D03EA,0        ,akaikqsdfj03EA,                                ,-3A
 bool rn4020::parseAdvertisement(char* buffer)
 {
-    byte i=0;
-    char* advertisement=(char*)malloc(strlen(buffer)+1);
-    if(!advertisement)
-    {
-        return false;
-    }
-    strcpy(advertisement, buffer);
-    char* pch = strrchr(advertisement,',');
-    ADVERTISEMENT adv;
-
-    for(i=0;i<4 && pch != NULL;i++)
-    {
-        pch = strrchr(advertisement,',');
-        switch(i)
-        {
-        case 0:
-            adv.rssi=atoi(pch+1);
-            break;
-        case 1:
-            strcpy(adv.privCharacteristic, pch+1);
-            break;
-        case 2:
-            break;
-        case 3:
-            break;
-        }
-        *pch = '\0';
-    }
-    strcpy(adv.btAddress,advertisement);
-    free(advertisement);
-    if(i!=4 || (!_ftAdvertisementReceived))
-    {
-        return false;
-    }
-    _ftAdvertisementReceived(&adv);
-    return true;
+    return false;
 }
 
 bool rn4020::doRemovePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 void rn4020::setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*))
@@ -629,13 +589,13 @@ bool rn4020::setBaudrate(unsigned long baud)
 #endif
         return false;
     }
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::setBluetoothDeviceName(const char* btName)
 {
     ble2_set_device_bluetooth_name(btName);
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 void rn4020::setBondingListener(void (*ftBonding)(BONDING_MODES bd))
@@ -661,7 +621,7 @@ void rn4020::setConnectionListener(void (*ftConnection)(bool))
 bool rn4020::setFeatures(uint32_t features)
 {
     ble2_set_supported_features(features);
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 
@@ -682,7 +642,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         digitalWrite(_pinWake_sw_7, LOW);
         if(bInNormalMode)
         {
-            bSuccess=waitForReply(1000,"END\r\n");
+            bSuccess=waitForReply(1000,"END");
         }
         digitalWrite(_pinWake_hw_15, HIGH);
         delay(10);
@@ -704,7 +664,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
 bool rn4020::setServices(uint32_t services)
 {
     ble2_set_server_services(services);
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::setTxPower(byte pwr)
@@ -714,13 +674,13 @@ bool rn4020::setTxPower(byte pwr)
         return false;
     }
     ble2_set_transmission_power((tx_pwr_t)pwr);
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 bool rn4020::startBonding()
 {
     ble2_bond(SAVED);
-    return waitForReply(2000,"AOK\r\n");
+    return waitForReply(2000,"AOK");
 }
 
 /* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
@@ -734,7 +694,7 @@ void rn4020::updateHandles()
 
     //Get list of services
     ble2_list_server_services();
-    if(!waitForReply(2000, "END\r\n"))
+    if(!waitForReply(2000, "END"))
     {
         return;
     }
@@ -809,10 +769,14 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     }
     unsigned long ulStartTime=millis();
     do{
-        gotLine();
-    }while(millis()<ulStartTime+uiTimeout && (!strstr(rxbuf, pattern)));
-    indexRxBuf=0;
-    return strstr(rxbuf, pattern);
+        if(gotLine() && strstr(rxbuf, pattern))
+        {
+            indexRxBuf=0;
+            return true;
+        }
+    }while(millis()<ulStartTime+uiTimeout);
+
+    return false;
 }
 
 bool rn4020::waitForStartup(unsigned long baudrate)

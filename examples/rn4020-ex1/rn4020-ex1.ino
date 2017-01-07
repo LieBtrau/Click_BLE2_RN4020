@@ -113,6 +113,9 @@ void bleEvent(bleControl::EVENT ev)
         sw->println("Connection up");
         bConnected=true;
         break;
+    case bleControl::EV_CHARACTERISTIC_VALUE_CHANGED:
+        sw->println("Value of some characteristic changed");
+        break;
     default:
         sw->print("Unknown event: ");
         sw->println(ev, DEC);
