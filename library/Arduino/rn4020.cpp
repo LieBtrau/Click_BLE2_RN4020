@@ -514,6 +514,7 @@ void rn4020::loop()
     {
         _ftBondingEvent(BD_PASSCODE_NEEDED);
         *rxbuf='\0';    //avoid future calls
+        indexRxBuf=0;
         return;
     }
     if(!gotLine())

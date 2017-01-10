@@ -8,13 +8,6 @@ class bleControl
 public:
     typedef enum
     {
-        ST_NOTCONNECTED,
-        ST_PASS_GENERATED,
-        ST_PROV_BONDED,
-        ST_BONDED
-    }CONNECT_STATE;
-    typedef enum
-    {
         BLE_S_IMMEDIATE_ALERT_SERVICE,  //1802
         BLE_S_DEVICE_INFORMATION        //180A
     }BLE_SERVICES;
@@ -32,6 +25,7 @@ public:
     typedef enum
     {
         EV_PASSCODE_WANTED,
+        EV_PASSCODE_GENERATED,
         EV_CONNECTION_UP,
         EV_CONNECTION_DOWN,
         EV_CHARACTERISTIC_VALUE_CHANGED
@@ -49,12 +43,20 @@ public:
     void setEventListener(void(*ftEventReceived)(EVENT));
     void setPasscode(unsigned long pass);
     bool findUnboundPeripheral(const char *remoteBtAddress);
-    CONNECT_STATE secureConnect(const char* remoteBtAddress, CONNECT_STATE state);
     unsigned long getPasscode();
     bool writeServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTICS chr, byte value);
     bool readServiceCharacteristic(BLE_SERVICES serv, BLE_CHARACTERISTICS chr, byte* value, byte& length);
+    bool secureConnect(const char* peripheralMac);
     void disconnect();
 private:
+    typedef enum
+    {
+        ST_NOTCONNECTED,
+        ST_CONNECTED,
+        ST_PASSCODE_GENERATED,
+        ST_PROV_BONDED,
+        ST_BONDED
+    }CONNECT_STATE;
     word getRemoteHandle(BLE_SERVICES serv, BLE_CHARACTERISTICS chr);
 };
 

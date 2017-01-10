@@ -73,7 +73,7 @@ bool bleControl::begin(bool bCentral)
     char dataname[20];
     const char BT_NAME_KEYFOB[]="AiakosKeyFob";
     const char BT_NAME_BIKE[]="AiakosBike";
-
+    
     bIsCentral=bCentral;
     //Switch to 2400baud
     // + It's more reliable than 115200baud with the ProTrinket 3V.
@@ -96,7 +96,7 @@ bool bleControl::begin(bool bCentral)
         if(strncmp(dataname,BT_NAME_BIKE, strlen(BT_NAME_BIKE)))
         {
             //Module not yet correctly configured
-
+            
             //Services: Device Information + Battery Level services
             if(!rn.setServices(SRV_BATTERY | SRV_DEVICE_INFO))
             {
@@ -128,7 +128,7 @@ bool bleControl::begin(bool bCentral)
         if(strncmp(dataname,BT_NAME_KEYFOB, strlen(BT_NAME_KEYFOB)))
         {
             //Module not yet correctly configured
-
+            
             //Enable authentication with Keyboard and display as IO-capabilities
             //Server only (services will only be served, no client functionalities)
             if(!rn.setFeatures(FR_AUTH_KEYB_DISP | FR_SERV_ONLY))
@@ -186,7 +186,7 @@ bool bleControl::begin(bool bCentral)
         }
         return rn.setOperatingMode(rn4020::OM_DEEP_SLEEP);
     }
-
+    
 }
 
 void bleControl::disconnect()
@@ -229,61 +229,69 @@ bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
     return bFound;
 }
 
-bleControl::CONNECT_STATE bleControl::secureConnect(const char* remoteBtAddress, CONNECT_STATE state)
+
+bool bleControl::secureConnect(const char* remoteBtAddress)
 {
     unsigned long ulStartTime;
-    switch(state)
+    CONNECT_STATE state=ST_NOTCONNECTED;
+    do
     {
-    case ST_NOTCONNECTED:
-        if(!rn.doConnecting(remoteBtAddress))
+        switch(state)
         {
-            //stop connecting process
-            rn.doStopConnecting();
-            return ST_NOTCONNECTED;
-        }
-        delay(1000);
-        if(!rn.startBonding())
-        {
-            rn.doDisconnect();
-            return ST_NOTCONNECTED;
-        }
-        ulStartTime=millis();
-        while(millis()<ulStartTime+10000)
-        {
+        case ST_NOTCONNECTED:
+            if(!rn.doConnecting(remoteBtAddress))
+            {
+                //stop connecting process
+                rn.doStopConnecting();
+                return false;
+            }
+            delay(1000);
+            bPassReady=false;
+            if(!rn.startBonding())
+            {
+                rn.doDisconnect();
+                return false;
+            }
+            ulStartTime=millis();
+            state=ST_CONNECTED;
+            break;
+        case ST_CONNECTED:
+            if(millis()>ulStartTime+10000)
+            {
+                disconnect();
+                return false;
+            }
             loop();
             if(bPassReady)
             {
-                bPassReady=false;
-                return ST_PASS_GENERATED;
+                bIsBonded=false;
+                generateEvent(EV_PASSCODE_GENERATED);
+                state=ST_PASSCODE_GENERATED;
+                ulStartTime=millis();
             }
-            if(bIsBonded)
+            break;
+        case ST_PASSCODE_GENERATED:
+            if(millis()>ulStartTime+10000)
             {
-                return ST_PROV_BONDED;
+                disconnect();
+                return false;
             }
-        }
-        disconnect();
-        return ST_NOTCONNECTED;
-    case ST_PASS_GENERATED:
-        ulStartTime=millis();
-        while(millis()<ulStartTime+10000)
-        {
             loop();
             if(bIsBonded)
             {
-                return ST_PROV_BONDED;
+                state=ST_PROV_BONDED;
             }
+            break;
+        case ST_PROV_BONDED:
+            if(!rn.startBonding())
+            {
+                rn.doDisconnect();
+                return false;
+            }
+            state=ST_BONDED;
         }
-        disconnect();
-        return ST_NOTCONNECTED;
-    case ST_PROV_BONDED:
-        if(!rn.startBonding())
-        {
-            rn.doDisconnect();
-            return ST_NOTCONNECTED;
-        }
-    case ST_BONDED:
-        return ST_BONDED;
-    }
+    }while(state!=ST_BONDED);
+
 }
 
 unsigned long bleControl::getPasscode()
@@ -330,7 +338,7 @@ word bleControl::getRemoteHandle(BLE_SERVICES serv, BLE_CHARACTERISTICS chr)
     char services[2][5]={"1802","180A"};
     char characteristics[2][5]={"2A06","2A25"};
     char* servptr, *chrptr;
-
+    
     switch(serv)
     {
     case BLE_S_IMMEDIATE_ALERT_SERVICE:
@@ -353,9 +361,11 @@ word bleControl::getRemoteHandle(BLE_SERVICES serv, BLE_CHARACTERISTICS chr)
     default:
         return false;
     }
-
+    
     return rn.getRemoteHandle(servptr,chrptr);
 }
+
+
 
 void bleControl::setEventListener(void(*ftEventReceived)(EVENT))
 {

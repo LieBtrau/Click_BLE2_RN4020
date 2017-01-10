@@ -22,7 +22,6 @@ HardwareSerial* sw=&Serial;
 //~/Programs/arduino-1.6.9/arduino --verify --board Arduino_STM32:STM32F1:nucleo_f103rb --pref target_package=Arduino_STM32 --pref build.path=/home/ctack/build --pref target_platform=STM32F1 --pref board=nucleo_f103rb ~/Arduino/blinky_nucleo/blinky_nucleo.ino
 
 
-
 uint32_t ulStartTime;
 bool bConnected;
 
@@ -50,7 +49,10 @@ void setup() {
             sw->println("Remote peer not found");
             return;
         }
-        secureConnect(peripheralMac);
+        if(!ble.secureConnect(peripheralMac))
+        {
+            return;
+        }
 
         //Example of writing a characteristic
         ble.writeServiceCharacteristic(bleControl::BLE_S_IMMEDIATE_ALERT_SERVICE, bleControl::BLE_CH_ALERT_LEVEL,1);
@@ -67,7 +69,7 @@ void setup() {
         delay(5000);
         ble.disconnect();
         delay(5000);
-        secureConnect(peripheralMac);
+        ble.secureConnect(peripheralMac);
     }
 }
 
@@ -75,27 +77,6 @@ void loop() {
     ble.loop();
 }
 
-void secureConnect(char* peripheralMac)
-{
-    sw->println("Trying secure connect");
-    bleControl::CONNECT_STATE state=bleControl::ST_NOTCONNECTED;
-    do
-    {
-        state=ble.secureConnect(peripheralMac, state);
-        switch(state)
-        {
-        case bleControl::ST_PASS_GENERATED:
-            sw->print("Peripheral must set PASS: ");
-            sw->println(ble.getPasscode(), DEC);
-            break;
-        case bleControl::ST_BONDED:
-            sw->println("Bonded!");
-            break;
-        default:
-            break;
-        }
-    }while(state!=bleControl::ST_NOTCONNECTED && state!=bleControl::ST_BONDED);
-}
 
 void bleEvent(bleControl::EVENT ev)
 {
@@ -104,6 +85,10 @@ void bleEvent(bleControl::EVENT ev)
     case bleControl::EV_PASSCODE_WANTED:
         sw->println("Let's guess that the passcode is 123456");
         ble.setPasscode(123456);
+        break;
+    case bleControl::EV_PASSCODE_GENERATED:
+        sw->print("Peripheral must set PASS: ");
+        sw->println(ble.getPasscode(), DEC);
         break;
     case bleControl::EV_CONNECTION_DOWN:
         sw->println("Connection down");
