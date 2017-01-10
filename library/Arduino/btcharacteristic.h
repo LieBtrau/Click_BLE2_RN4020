@@ -23,7 +23,8 @@ public:
     }SECURITY_FLAGS;
     btCharacteristic(const char* uuid_service, const char* uuid_characteristic, PROPERTY_FLAGS propertyBmp,
                      byte valueLength, SECURITY_FLAGS securityBmp);
-    void setListener(void (*ftListener)(byte*, byte&));
+    btCharacteristic(const char* uuid_service, const char* uuid_characteristic, PROPERTY_FLAGS propertyBmp,
+                     byte valueLength, SECURITY_FLAGS securityBmp, void (*ftListener)(byte*, byte&));
     void setHandle(word handle);
     const char* getUuidService();
     const char* getUuidCharacteristic();

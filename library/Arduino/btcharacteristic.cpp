@@ -1,9 +1,19 @@
 #include "btcharacteristic.h"
-#include <ctype.h>
 
-btCharacteristic::btCharacteristic(const char* uuid_service, const char* uuid_characteristic,
-                                   PROPERTY_FLAGS propertyBmp, byte valueLength,
+btCharacteristic::btCharacteristic(const char* uuid_service,
+                                   const char* uuid_characteristic,
+                                   PROPERTY_FLAGS propertyBmp,
+                                   byte valueLength,
                                    SECURITY_FLAGS securityBmp):
+    btCharacteristic(uuid_service, uuid_characteristic, propertyBmp, valueLength, securityBmp, 0)
+{}
+
+btCharacteristic::btCharacteristic(const char* uuid_service,
+                                   const char* uuid_characteristic,
+                                   PROPERTY_FLAGS propertyBmp,
+                                   byte valueLength,
+                                   SECURITY_FLAGS securityBmp,
+                                   void (*ftListener)(byte*, byte&)):
     _propertyBmp(propertyBmp),
     _valueLength(valueLength),
     _securityBmp(securityBmp),
@@ -12,7 +22,9 @@ btCharacteristic::btCharacteristic(const char* uuid_service, const char* uuid_ch
 {
     _uuid_service = cleanupUuid(uuid_service);
     _uuid_characteristic=cleanupUuid(uuid_characteristic);
+    _ftListener=ftListener;
 }
+
 
 const char *btCharacteristic::getUuidService()
 {
@@ -42,11 +54,6 @@ word btCharacteristic::getHandle()
 byte btCharacteristic::getSecurityBmp()
 {
     return _securityBmp;
-}
-
-void btCharacteristic::setListener(void (*ftListener)(byte*, byte&))
-{
-    _ftListener=ftListener;
 }
 
 void btCharacteristic::setHandle(word handle)

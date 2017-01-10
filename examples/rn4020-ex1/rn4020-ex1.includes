@@ -4,3 +4,4 @@
 ~/Downloads/arduino-1.6.9/hardware/Arduino_STM32/STM32F1/system/libmaple/include"
 ~/Downloads/arduino-1.6.9/hardware/Arduino_STM32/STM32F1/system/libmaple/stm32f1/include"                                                           "-I/home/ctack/Downloads/arduino-1.6.9/hardware/Arduino_STM32/STM32F1/system/libmaple/usb/stm32f1" "-I/home/ctack/Downloads/arduino-1.6.9/hardware/Arduino_STM32/STM32F1/system/libmaple/usb/usb_lib" "-I/home/ctack/Downloads/arduino-1.6.9/hardware/Arduino_STM32/STM32F1/cores/maple" "-I/home/ctack/Downloads/arduino-1.6.9/hardware/Arduino_STM32/STM32F1/variants/nucleo_f103rb"
 ~/Arduino/libraries/Click_BLE2_RN4020"
+~/git/Click_BLE2_RN4020/library/Arduino
