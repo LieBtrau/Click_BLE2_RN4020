@@ -73,7 +73,7 @@ void setup() {
         {
             return;
         }
-        //Example of reading a characteristic
+        //Example of reading a remote characteristic
         byte value[20];
         byte length;
         btCharacteristic serial_number("180A",                      //Device Information Service
@@ -92,7 +92,18 @@ void setup() {
     }
     else
     {
-
+        //Example of reading a local characteristic
+        byte value[20];
+        byte length;
+        btCharacteristic serial_number("180A",                      //Device Information Service
+                                       "2A25",                      //Serial Number String
+                                       btCharacteristic::READ, 20,  //properties+length
+                                       btCharacteristic::NOTHING);  //security
+        if(ble.readLocalCharacteristic(&serial_number, value, length))
+        {
+            sw->print("Serial number of peripheral is: ");
+            sw->println((char*)value);
+        }
     }
 }
 

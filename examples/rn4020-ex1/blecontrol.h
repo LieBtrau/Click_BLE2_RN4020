@@ -37,6 +37,7 @@ public:
     unsigned long getPasscode();
     bool writeRemoteCharacteristic(btCharacteristic* bt, byte value);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
+    bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);
     bool secureConnect(const char* peripheralMac);
     void disconnect();
 private:
@@ -49,6 +50,7 @@ private:
         ST_BONDED
     }CONNECT_STATE;
     word getRemoteHandle(btCharacteristic *bt);
+    word getLocalHandle(btCharacteristic *bt);
 };
 
 #endif // BLECONTROL_H

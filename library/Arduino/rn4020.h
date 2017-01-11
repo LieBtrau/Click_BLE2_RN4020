@@ -50,12 +50,14 @@ public:
     bool doStopConnecting();
     bool doRemoveBond();
     bool doRemovePrivateCharacteristics();
+    bool doReadLocalCharacteristic(word handle, byte* array, byte& length);
     bool doReadRemoteCharacteristic(word handle, byte* array, byte& length);
     void doUpdateHandles(btCharacteristic** characteristicList, byte count);
     bool doWriteRemoteCharacteristic(word handle, const byte *array, byte length);
     bool getBluetoothDeviceName(char* btName);
+    word getLocalHandle(btCharacteristic* bt);
     bool getMacAddress(byte* array, byte& length);
-    word getRemoteHandle(const char* service, const char* characteristic);
+    word getRemoteHandle(btCharacteristic *bt);
     void loop();
     void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool setBluetoothDeviceName(const char* btName);
@@ -77,6 +79,8 @@ private:
     void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
     bool isModuleActive(unsigned long uiTimeout);
     bool parseAdvertisement(char* buffer);
+    word parseServicesList(btCharacteristic *bt);
+    void resetBuffer();
     bool setBaudrate(unsigned long baud);
     word waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);

@@ -467,7 +467,7 @@ void ble2_list_server_services();
  * 16-bit hexadecimal value of the handle, which corresponds to a characteristic of the client service.
  * Users can find a match between the handle and its characteristic UUID using the by listing characteristics and services.
  */
-void ble2_read_characteristic_content(uint16_t handle);
+void ble2_read_client_characteristic_content(uint16_t handle);
 /**
  * @brief
  * Writes the contents of the characteristic in the client service from a remote device by addressing its handle.
@@ -518,7 +518,7 @@ void ble2_write_characteristic_content_via_UUID(const char* UUID, const char* co
  * @param handle
  * 16-bit hexadecimal value of the handle, which corresponds to a characteristic of the server service
  */
-void ble2_read_server_characteristic_value_via_handle (uint16_t handle);
+void ble2_read_server_characteristic_content(uint16_t handle);
 /**
  * @brief
  * Writes the contents of the characteristic in the server service to a local device by addressing its handle.

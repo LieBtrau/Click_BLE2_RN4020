@@ -312,15 +312,22 @@ bool bleControl::readRemoteCharacteristic(btCharacteristic *bt, byte* value, byt
     return rn.doReadRemoteCharacteristic(handle, value, length);
 }
 
+bool bleControl::readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length)
+{
+    word handle=getLocalHandle(bt);
+    if(!handle)
+    {
+        return false;
+    }
+    return rn.doReadLocalCharacteristic(handle, value, length);
+}
+
+
 bool bleControl::getLocalMacAddress(byte* address, byte& length)
 {
     return rn.getMacAddress(address, length);
 }
 
-
-/* Handles are fetched from the server on every read/write request.  That's the simplest thing to do, but it's far from
- * power efficient for the peripheral.
- */
 word bleControl::getRemoteHandle(btCharacteristic* bt)
 {
     word handle=bt->getHandle();
@@ -328,7 +335,21 @@ word bleControl::getRemoteHandle(btCharacteristic* bt)
     {
         return handle;
     }
-    return rn.getRemoteHandle(bt->getUuidService(),bt->getUuidCharacteristic());
+    handle=rn.getRemoteHandle(bt);
+    bt->setHandle(handle);
+    return handle;
+}
+
+word bleControl::getLocalHandle(btCharacteristic* bt)
+{
+    word handle=bt->getHandle();
+    if(handle)
+    {
+        return handle;
+    }
+    handle=rn.getLocalHandle(bt);
+    bt->setHandle(handle);
+    return handle;
 }
 
 

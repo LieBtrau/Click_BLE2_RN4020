@@ -204,6 +204,36 @@ bool rn4020::doFindRemoteDevices(bool bEnabled)
     return waitForReply(2000,"AOK");
 }
 
+bool rn4020::doReadLocalCharacteristic(word handle, byte* array, byte& length)
+{
+    char hexarray[41];//maximum data length=20 bytes
+    ble2_read_server_characteristic_content(handle);
+    if(!waitForNrOfLines(2000,1))
+    {
+        return false;
+    }
+    hex2array(rxbuf, array, length);
+    resetBuffer();
+    return true;
+}
+
+bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
+{
+    char hexarray[41];//maximum data length=20 bytes
+    ble2_read_client_characteristic_content(handle);
+    if(!waitForNrOfLines(2000,1))
+    {
+        return false;
+    }
+    if(sscanf(rxbuf, "R,%40s.", hexarray)!=1)
+    {
+        return false;
+    }
+    hex2array(hexarray, array, length);
+    return true;
+}
+
+
 bool rn4020::doReboot(unsigned long baudrate)
 {
     ble2_device_reboot();
@@ -224,21 +254,6 @@ bool rn4020::doStopConnecting()
     return waitForReply(2000,"AOK");
 }
 
-bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
-{
-    char hexarray[41];//maximum data length=20 bytes
-    ble2_read_characteristic_content(handle);
-    if(!waitForNrOfLines(2000,1))
-    {
-        return false;
-    }
-    if(sscanf(rxbuf, "R,%40s.", hexarray)!=1)
-    {
-        return false;
-    }
-    hex2array(hexarray, array, length);
-    return true;
-}
 
 
 /* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
@@ -246,8 +261,6 @@ bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
  */
 void rn4020::doUpdateHandles(btCharacteristic** characteristicList, byte count)
 {
-    char* pch;
-    byte state=0;
     byte ctr=0;
 
     //Get list of services
@@ -256,51 +269,10 @@ void rn4020::doUpdateHandles(btCharacteristic** characteristicList, byte count)
     {
         return;
     }
-    //Parse response line by line
-    pch = strtok (rxbuf,"\r\n");
-    do
+    for(ctr=0;ctr<count;ctr++)
     {
-        switch(state)
-        {
-        case 0:
-            //Check if the line contains a service
-            for(ctr=0;ctr<count;ctr++)
-            {
-                //Nothing found yet, split string in lines;
-                if(strstr(pch,characteristicList[ctr]->getUuidService()))
-                {
-                    //Service found, now looking for line with characteristic
-                    state=1;
-                    break;
-                }
-            }
-            break;
-        case 1:
-            if(strncmp(pch,"  ",2))
-            {
-                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
-                return;
-            }
-            if(strstr(pch, characteristicList[ctr]->getUuidCharacteristic()))
-            {
-                //Characteristic found, now looking for handle
-                char* pch2=strchr(pch,',')+1;
-                word handle;
-                if(sscanf(pch2, "%x,", &handle)==1)
-                {
-                    //#if DEBUG_LEVEL >= DEBUG_ALL
-                    //                    sPortDebug->println("Setting handle");
-                    //                    sPortDebug->println(handle, HEX);
-                    //#endif
-                    characteristicList[ctr]->setHandle(handle);
-
-                }
-                state=0;
-                break;
-            }
-        }
-        pch = strtok (NULL, "\r\n");
-    }while (pch != NULL);
+        characteristicList[ctr]->setHandle(parseServicesList(characteristicList[ctr]));
+    }
 }
 
 
@@ -372,60 +344,24 @@ bool rn4020::getMacAddress(byte* array, byte& length)
     }
 }
 
-word rn4020::getRemoteHandle(const char* service, const char* characteristic)
+word rn4020::getLocalHandle(btCharacteristic* bt)
 {
-    char* pch;
-    byte state=0;
-    byte ctr=0;
+    ble2_list_server_services();
+    if(!waitForReply(5000, "END"))
+    {
+        return 0;
+    }
+    return parseServicesList(bt);
+}
 
-    //Get list of services
+word rn4020::getRemoteHandle(btCharacteristic* bt)
+{
     ble2_list_client_services();
     if(!waitForReply(5000, "END"))
     {
         return 0;
     }
-    //Parse response line by line
-    pch = strtok (rxbuf,"\r\n");
-    do
-    {
-        switch(state)
-        {
-        case 0:
-            //Check if the line contains a service
-            if(strstr(pch,service))
-            {
-                //Service found, now looking for line with characteristic
-                state=1;
-                break;
-            }
-            break;
-        case 1:
-            if(strncmp(pch,"  ",2))
-            {
-                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
-                return 0;
-            }
-            if(strstr(pch, characteristic))
-            {
-                //Characteristic found, now looking for handle
-                char* pch2=strchr(pch,',')+1;
-                word handle;
-                if(sscanf(pch2, "%x,", &handle)==1)
-                {
-                    //#if DEBUG_LEVEL >= DEBUG_ALL
-                    //                    sPortDebug->println("Setting handle");
-                    //                    sPortDebug->println(handle, HEX);
-                    //#endif
-                    return handle;
-
-                }
-                state=0;
-                break;
-            }
-        }
-        pch = strtok (NULL, "\r\n");
-    }while (pch != NULL);
-    return 0;
+    return parseServicesList(bt);
 }
 
 
@@ -443,11 +379,11 @@ bool rn4020::gotLine()
         if(indexRxBuf==BUFFSIZE-1)
         {
             //Reset buffer when there's an overflow
-            indexRxBuf=0;
+            resetBuffer();
         }
     }
-#if DEBUG_LEVEL >= DEBUG_ALL
     static char b=0,d=0;
+#if DEBUG_LEVEL >= DEBUG_ALL
     if(b==0 && d==0)
     {
         sPortDebug->print("\r\nRX: ");
@@ -456,14 +392,17 @@ bool rn4020::gotLine()
     {
         sPortDebug->print(c);
     }
+#endif
     b=d;
     d=c;
     if(b=='\r' && d=='\n')
     {
+#if DEBUG_LEVEL >= DEBUG_ALL
         sPortDebug->print("\r\nRX: ");
-    }
 #endif
-    return strstr(rxbuf,"\r\n");
+        return true;
+    }
+    return false;
 }
 
 void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
@@ -513,15 +452,13 @@ void rn4020::loop()
     if(!strncmp(rxbuf, "Passcode:", 9) && _ftBondingEvent)
     {
         _ftBondingEvent(BD_PASSCODE_NEEDED);
-        *rxbuf='\0';    //avoid future calls
-        indexRxBuf=0;
+        resetBuffer();
         return;
     }
     if(!gotLine())
     {
         return;
     }
-    indexRxBuf=0;
     if(strstr(rxbuf, "Secured") && _ftBondingEvent)
     {
         _ftBondingEvent(BD_ESTABLISHED);
@@ -572,10 +509,65 @@ bool rn4020::parseAdvertisement(char* buffer)
     return false;
 }
 
+word rn4020::parseServicesList(btCharacteristic* bt)
+{
+    char* pch;
+    byte state=0;
+
+    //Parse response line by line
+    pch = strtok (rxbuf,"\r\n");
+    do
+    {
+        switch(state)
+        {
+        case 0:
+            //Check if the line contains a service
+            if(strstr(pch,bt->getUuidService()))
+            {
+                //Service found, now looking for line with characteristic
+                state=1;
+                break;
+            }
+            break;
+        case 1:
+            if(strncmp(pch,"  ",2))
+            {
+                //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
+                return 0;
+            }
+            if(strstr(pch, bt->getUuidCharacteristic()))
+            {
+                //Characteristic found, now looking for handle
+                char* pch2=strchr(pch,',')+1;
+                word handle;
+                if(sscanf(pch2, "%x,", &handle)==1)
+                {
+                    //#if DEBUG_LEVEL >= DEBUG_ALL
+                    //                    sPortDebug->println("Setting handle");
+                    //                    sPortDebug->println(handle, HEX);
+                    //#endif
+                    return handle;
+
+                }
+                state=0;
+                break;
+            }
+        }
+        pch = strtok (NULL, "\r\n");
+    }while (pch != NULL);
+
+}
+
 bool rn4020::doRemovePrivateCharacteristics()
 {
     ble2_private_service_clear_all();
     return waitForReply(2000,"AOK");
+}
+
+void rn4020::resetBuffer()
+{
+    *rxbuf='\0';    //avoid future calls
+    indexRxBuf=0;
 }
 
 void rn4020::setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*))
@@ -675,7 +667,7 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         digitalWrite(_pinWake_sw_7, LOW);
         if(bInNormalMode)
         {
-            bSuccess=waitForReply(1000,"END\r\n");
+            bSuccess=waitForReply(1000,"END");
         }
         digitalWrite(_pinWake_hw_15, HIGH);
         delay(10);
@@ -730,8 +722,7 @@ word rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 //Read multiple lines and search for pattern
 bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
 {
-    rxbuf[0]='\0';
-    indexRxBuf=0;
+    resetBuffer();
     if(!pattern || !strlen(pattern))
     {
 #if DEBUG_LEVEL >= DEBUG_ALL
@@ -743,7 +734,7 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     do{
         if(gotLine() && strstr(rxbuf, pattern))
         {
-            indexRxBuf=0;
+            resetBuffer();
             return true;
         }
     }while(millis()<ulStartTime+uiTimeout);

@@ -482,7 +482,7 @@ void ble2_list_server_services()
     ble2_hal_send("LS");
 }
 
-void ble2_read_characteristic_content(uint16_t handle)
+void ble2_read_client_characteristic_contentcontent(uint16_t handle)
 {
     char tmp [15] = {0};
     char tmp2 [5] = {0};
@@ -548,7 +548,7 @@ void  ble2_write_characteristic_content_via_UUID(const char* UUID, const char* c
     ble2_hal_send(tmp);
 }
 
-void ble2_read_server_characteristic_value_via_handle (uint16_t handle)
+void ble2_read_server_characteristic_content(uint16_t handle)
 {
     char tmp[13] = {0};
     char tmp2[5];
