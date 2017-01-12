@@ -462,16 +462,19 @@ void rn4020::loop()
     if(strstr(rxbuf, "Secured") && _ftBondingEvent)
     {
         _ftBondingEvent(BD_ESTABLISHED);
+        resetBuffer();
         return;
     }
     if(strstr(rxbuf, "Connected") && _ftConnectionStateChanged)
     {
         _ftConnectionStateChanged(true);
+        resetBuffer();
         return;
     }
     if(strstr(rxbuf, "Connection End") && _ftConnectionStateChanged)
     {
         _ftConnectionStateChanged(false);
+        resetBuffer();
         return;
     }
     if(sscanf(rxbuf, "WV,%04x,%32s ", &handle,value)==2 && _ftCharacteristicWritten)
@@ -479,11 +482,13 @@ void rn4020::loop()
         byte array[17];
         hex2array(value, array, length);
         _ftCharacteristicWritten(handle, array, length);
+        resetBuffer();
         return;
     }
     if(sscanf(rxbuf, "Peer Passcode:%d",&passcode)==1 && _ftPasscodeGenerated)
     {
         _ftPasscodeGenerated(passcode);
+        resetBuffer();
         return;
     }
     //If no matching string found
@@ -514,8 +519,14 @@ word rn4020::parseServicesList(btCharacteristic* bt)
     char* pch;
     byte state=0;
 
+    char* tempBuf=(char*)malloc(strlen(rxbuf)+1);
+    if(!tempBuf)
+    {
+        return false;
+    }
+    strcpy(tempBuf,rxbuf);
     //Parse response line by line
-    pch = strtok (rxbuf,"\r\n");
+    pch = strtok (tempBuf,"\r\n");
     do
     {
         switch(state)
@@ -533,6 +544,7 @@ word rn4020::parseServicesList(btCharacteristic* bt)
             if(strncmp(pch,"  ",2))
             {
                 //String doesn't start with two spaces, so this is not a characteristic.  This is an error.
+                free(tempBuf);
                 return 0;
             }
             if(strstr(pch, bt->getUuidCharacteristic()))
@@ -546,6 +558,7 @@ word rn4020::parseServicesList(btCharacteristic* bt)
                     //                    sPortDebug->println("Setting handle");
                     //                    sPortDebug->println(handle, HEX);
                     //#endif
+                    free(tempBuf);
                     return handle;
 
                 }
@@ -555,7 +568,7 @@ word rn4020::parseServicesList(btCharacteristic* bt)
         }
         pch = strtok (NULL, "\r\n");
     }while (pch != NULL);
-
+    free(tempBuf);
 }
 
 bool rn4020::doRemovePrivateCharacteristics()
@@ -712,6 +725,7 @@ bool rn4020::startBonding()
 word rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 {
     unsigned long ulStartTime=millis();
+    resetBuffer();
     while(millis()<ulStartTime+ulTimeout && getNrOfOccurrence(rxbuf,'\n')<nrOfEols)
     {
         gotLine();
@@ -734,7 +748,7 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     do{
         if(gotLine() && strstr(rxbuf, pattern))
         {
-            resetBuffer();
+            indexRxBuf=0; //reset pointer so that next writes will start at the beginning of the buffer.
             return true;
         }
     }while(millis()<ulStartTime+uiTimeout);
