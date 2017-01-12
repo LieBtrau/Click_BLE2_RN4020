@@ -92,6 +92,11 @@ void setup() {
     }
     else
     {
+        //Example of writing a local characteristic
+        if(!ble.writeLocalCharacteristic(&ias_alertLevel,12))
+        {
+            return;
+        }
         //Example of reading a local characteristic
         byte value[20];
         byte length;
@@ -104,6 +109,7 @@ void setup() {
             sw->print("Serial number of peripheral is: ");
             sw->println((char*)value);
         }
+
     }
 }
 

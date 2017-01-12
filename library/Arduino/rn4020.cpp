@@ -276,6 +276,23 @@ void rn4020::doUpdateHandles(btCharacteristic** characteristicList, byte count)
 }
 
 
+bool rn4020::doWriteLocalCharacteristic(word handle, const byte* array, byte length)
+{
+    char* hexString=(char*)malloc((length<<1)+1);
+    if(!hexString)
+    {
+        return false;
+    }
+    for(byte i=0;i<length;i++)
+    {
+        sprintf(hexString+(i<<1),"%02X", array[i]);
+    }
+    hexString[length<<1]='\0';
+    ble2_write_server_characteristic_content(handle, hexString);
+    return waitForReply(2000,"AOK");
+}
+
+
 bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte length)
 {
     char* hexString=(char*)malloc((length<<1)+1);
@@ -288,7 +305,7 @@ bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte le
         sprintf(hexString+(i<<1),"%02X", array[i]);
     }
     hexString[length<<1]='\0';
-    ble2_write_characteristic_content(handle, hexString);
+    ble2_write_client_characteristic_content(handle, hexString);
     return waitForReply(2000,"AOK");
 }
 

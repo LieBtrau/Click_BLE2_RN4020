@@ -476,7 +476,7 @@ void ble2_read_client_characteristic_content(uint16_t handle);
  * @param content
  * Content to be written
  */
-void ble2_write_characteristic_content(uint16_t handle, char* content);
+void ble2_write_client_characteristic_content(uint16_t handle, char* content);
 /**
  * @brief
  * Reads the configuration of a characteristic in the client service from a remote device by addressing its UUID.
@@ -527,7 +527,7 @@ void ble2_read_server_characteristic_content(uint16_t handle);
  * @param content
  * The second parameter is the content to be written to the characteristic
  */
-void ble2_write_server_characteristic_value_via_handle (uint16_t handle, char* content);
+void ble2_write_server_characteristic_content (uint16_t handle, char* content);
 /**
  * @brief
  * Reads the value of the characteristic in the server service on a local device by addressing its UUID.

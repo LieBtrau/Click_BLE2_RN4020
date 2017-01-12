@@ -53,6 +53,7 @@ public:
     bool doReadLocalCharacteristic(word handle, byte* array, byte& length);
     bool doReadRemoteCharacteristic(word handle, byte* array, byte& length);
     void doUpdateHandles(btCharacteristic** characteristicList, byte count);
+    bool doWriteLocalCharacteristic(word handle, const byte *array, byte length);
     bool doWriteRemoteCharacteristic(word handle, const byte *array, byte length);
     bool getBluetoothDeviceName(char* btName);
     word getLocalHandle(btCharacteristic* bt);

@@ -292,6 +292,16 @@ void bleControl::setPasscode(unsigned long pass)
     rn.setBondingPasscode(pass);
 }
 
+bool bleControl::writeLocalCharacteristic(btCharacteristic *bt, byte value)
+{
+    word handle=getLocalHandle(bt);
+    if(!handle)
+    {
+        return false;
+    }
+    return rn.doWriteLocalCharacteristic(handle,&value,1);
+}
+
 bool bleControl::writeRemoteCharacteristic(btCharacteristic *bt, byte value)
 {
     word handle=getRemoteHandle(bt);

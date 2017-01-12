@@ -35,6 +35,7 @@ public:
     void setPasscode(unsigned long pass);
     bool findUnboundPeripheral(const char *remoteBtAddress);
     unsigned long getPasscode();
+    bool writeLocalCharacteristic(btCharacteristic* bt, byte value);
     bool writeRemoteCharacteristic(btCharacteristic* bt, byte value);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
     bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);
