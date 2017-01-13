@@ -145,12 +145,11 @@ bool rn4020::doConnecting(const char* remoteBtAddress)
     {
         return false;
     }
-    if(!waitForReply(10000,"AOK"))
+    if(!waitForReply(2000,"AOK"))
     {
         return false;
     }
-    ble2_get_connection_status();
-    return waitForReply(2000,"Connected");
+    return waitForReply(10000,"Connected");
 }
 
 bool rn4020::doDisconnect()
@@ -191,17 +190,57 @@ bool rn4020::doFactoryDefault()
  * Bonded (but unconnected) devices will send directed advertisements (unless configured otherwise with "SR")
  * Devices sending directed advertisements will not be listed.
  */
-bool rn4020::doFindRemoteDevices(bool bEnabled)
+bool rn4020::doFindRemoteDevices(char** &macList, byte& nrOfItems, unsigned long timeout)
 {
-    if(bEnabled)
+    char hexarray[13];
+    ble2_query_peripheral_devices(0,0);
+    if(!waitForReply(2000,"AOK"))
     {
-        ble2_query_peripheral_devices(0,0);
+        return false;
     }
-    else
+    nrOfItems=waitForNrOfLines(timeout,20); //maximum 20 responses
+    char* tempBuf=(char*)malloc(strlen(rxbuf)+1);
+    if(!tempBuf)
     {
         ble2_stop_inquiry_process();
+        waitForReply(2000,"AOK");
+        return false;
     }
-    return waitForReply(2000,"AOK");
+    strcpy(tempBuf, rxbuf);
+    ble2_stop_inquiry_process();
+    if((!waitForReply(2000,"AOK")) || (!nrOfItems))
+    {
+        free(tempBuf);
+        return false;
+    }
+    char* pch = strtok (tempBuf,"\r\n");
+    nrOfItems=0;
+    do
+    {
+        if(sscanf(pch, "%12s,", hexarray)==1)
+        {
+            if(!nrOfItems)
+            {
+                macList=(char**)malloc(sizeof(char*));
+                if(!macList)
+                {
+                    return false;
+                }
+            }else
+            {
+                macList=(char**)realloc(macList,sizeof(char*) * nrOfItems);
+                if(!macList)
+                {
+                    return false;
+                }
+            }
+            macList[nrOfItems]=(char*)malloc(sizeof(char)*13);
+            strcpy(macList[nrOfItems],hexarray);
+            nrOfItems++;
+        }
+        pch = strtok (NULL, "\r\n");
+    }while (pch != NULL);
+    return true;
 }
 
 bool rn4020::doReadLocalCharacteristic(word handle, byte* array, byte& length)

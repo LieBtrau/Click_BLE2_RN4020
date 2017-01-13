@@ -47,7 +47,7 @@ void setup() {
     while (!(*sw)) ;
     sw->begin(9600);
     sw->println("I'm ready, folk!");
-    bool modeIsCentral=false;
+    bool modeIsCentral=true;
     char peripheralMac[]="001EC01D03EA";
     ble.setEventListener(bleEvent);
 

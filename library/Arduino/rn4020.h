@@ -45,7 +45,7 @@ public:
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
     bool doConnecting(const char* remoteBtAddress);
     bool doDisconnect();
-    bool doFindRemoteDevices(bool bEnabled);
+    bool doFindRemoteDevices(char **&macList, byte &nrOfItems, unsigned long timeout);
     bool doReboot(unsigned long baudrate);
     bool doStopConnecting();
     bool doRemoveBond();

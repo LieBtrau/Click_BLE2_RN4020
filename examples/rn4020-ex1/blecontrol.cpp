@@ -66,7 +66,7 @@ bool bleControl::begin(bool bCentral)
     char dataname[20];
     const char BT_NAME_KEYFOB[]="AiakosKeyFob";
     const char BT_NAME_BIKE[]="AiakosBike";
-    
+
     bIsCentral=bCentral;
     //Switch to 2400baud
     // + It's more reliable than 115200baud with the ProTrinket 3V.
@@ -89,7 +89,7 @@ bool bleControl::begin(bool bCentral)
         if(strncmp(dataname,BT_NAME_BIKE, strlen(BT_NAME_BIKE)))
         {
             //Module not yet correctly configured
-            
+
             //Services: Device Information + Battery Level services
             if(!rn.setServices(SRV_BATTERY | SRV_DEVICE_INFO))
             {
@@ -121,7 +121,7 @@ bool bleControl::begin(bool bCentral)
         if(strncmp(dataname,BT_NAME_KEYFOB, strlen(BT_NAME_KEYFOB)))
         {
             //Module not yet correctly configured
-            
+
             //Enable authentication with Keyboard and display as IO-capabilities
             //Server only (services will only be served, no client functionalities)
             if(!rn.setFeatures(FR_AUTH_KEYB_DISP | FR_SERV_ONLY))
@@ -174,7 +174,7 @@ bool bleControl::begin(bool bCentral)
         }
         return rn.setOperatingMode(rn4020::OM_DEEP_SLEEP);
     }
-    
+
 }
 
 void bleControl::disconnect()
@@ -193,27 +193,22 @@ bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
     //Unbound first, otherwise the bonded module can't be found by a scan
     //Don't check for return value, because if the central was not bonded, an "ERR" will be returned.
     rn.doRemoveBond();
+    char** macList;
+    byte nrOfItems;
     //Start search
-    if(!rn.doFindRemoteDevices(true))
+    if(!rn.doFindRemoteDevices(macList, nrOfItems, 6000))
     {
         return false;
     }
-    //Polling loop
-    unsigned long ulStartTime=millis();
-    while(millis()<ulStartTime+6000)
+    for(byte i=0;i<nrOfItems;i++)
     {
-        loop();
-        if(!strcmp(remoteBtAddress, (char*)foundBtAddress))
+        if(!strcmp(remoteBtAddress,macList[i]))
         {
             bFound=true;
-            break;
         }
+        free(macList[i]);
     }
-    //Stop searching
-    if(!rn.doFindRemoteDevices(false))
-    {
-        return false;
-    }
+    free(macList);
     return bFound;
 }
 
