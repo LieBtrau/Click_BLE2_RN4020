@@ -190,9 +190,13 @@ bool bleControl::loop()
 bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
 {
     bool bFound=false;
+    bool bonded;
+
     //Unbound first, otherwise the bonded module can't be found by a scan
-    //Don't check for return value, because if the central was not bonded, an "ERR" will be returned.
-    rn.doRemoveBond();
+    if(rn.isBonded(bonded) && bonded)
+    {
+        rn.doRemoveBond();
+    }
     char** macList;
     byte nrOfItems;
     //Start search

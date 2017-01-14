@@ -348,6 +348,27 @@ bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte le
     return waitForReply(2000,"AOK");
 }
 
+bool rn4020::isBonded(bool &status)
+{
+    ble2_get_bonded_status();
+    char str[]="No Bonding";
+    char mac[13];
+    if(!waitForNrOfLines(2000,1))
+    {
+        return false;
+    }
+    if(!strncmp(rxbuf,str,strlen(str)))
+    {
+        status=false;
+        return true;
+    }
+    if(sscanf(rxbuf,"%12s,0",mac))
+    {
+        status=true;
+        return true;
+    }
+    return false;
+}
 
 bool rn4020::getBluetoothDeviceName(char* btName)
 {

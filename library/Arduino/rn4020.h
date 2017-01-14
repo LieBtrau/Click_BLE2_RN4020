@@ -59,6 +59,7 @@ public:
     word getLocalHandle(btCharacteristic* bt);
     bool getMacAddress(byte* array, byte& length);
     word getRemoteHandle(btCharacteristic *bt);
+    bool isBonded(bool &status);
     void loop();
     void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool setBluetoothDeviceName(const char* btName);
