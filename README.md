@@ -16,7 +16,7 @@ The original MikroE BLE2-click has some shortcomings.  The BLE2-click board desc
 
 ## Software
 
-State: In progress
+State: central & peripheral functionality implemented (and tested on Nucleo STM32F103)
 
 The original MikroE library is far from complete.  It only holds functions to send data to the RN4020.  There's no functionality to parse the response from the RN4020.  
-This library will include a central/peripheral application using private characteristics, implemented for Arduino.
+This library includes a central/peripheral application using private characteristics, implemented for Arduino.
