@@ -293,9 +293,12 @@ void ble2_bond(bond_saving_t parameter)
     ble2_hal_send(tmp);
 }
 
-void ble2_set_passcode(const char* passcode)
+void ble2_set_passcode(unsigned long passcode)
 {
-    ble2_hal_send(passcode);
+    const int n = snprintf(NULL, 0, "%lu", passcode);
+    char buf[n+1];
+    snprintf(buf, n+1, "%lu", passcode);
+    ble2_hal_send(buf);
 }
 
 void ble2_display_critical_info()
@@ -479,7 +482,7 @@ void ble2_list_server_services()
     ble2_hal_send("LS");
 }
 
-void ble2_read_characteristic_content(uint16_t handle)
+void ble2_read_client_characteristic_content(uint16_t handle)
 {
     char tmp [15] = {0};
     char tmp2 [5] = {0};
@@ -490,7 +493,7 @@ void ble2_read_characteristic_content(uint16_t handle)
     ble2_hal_send(tmp);
 }
 
-void  ble2_write_characteristic_content(uint16_t handle, char* content)
+void  ble2_write_client_characteristic_content(uint16_t handle, char* content)
 {
     char tmp[20] = {0};
     char tmp2 [5] = {0};
@@ -545,7 +548,7 @@ void  ble2_write_characteristic_content_via_UUID(const char* UUID, const char* c
     ble2_hal_send(tmp);
 }
 
-void ble2_read_server_characteristic_value_via_handle (uint16_t handle)
+void ble2_read_server_characteristic_content(uint16_t handle)
 {
     char tmp[13] = {0};
     char tmp2[5];
@@ -556,7 +559,7 @@ void ble2_read_server_characteristic_value_via_handle (uint16_t handle)
     ble2_hal_send(tmp);
 }
 
-void ble2_write_server_characteristic_value_via_handle (uint16_t handle, char* content)
+void ble2_write_server_characteristic_content(uint16_t handle, char* content)
 {
     char tmp[23] = {0};
     char tmp2[5];

@@ -23,7 +23,8 @@ public:
     }SECURITY_FLAGS;
     btCharacteristic(const char* uuid_service, const char* uuid_characteristic, PROPERTY_FLAGS propertyBmp,
                      byte valueLength, SECURITY_FLAGS securityBmp);
-    void setListener(void (*ftListener)(char*, byte&));
+    btCharacteristic(const char* uuid_service, const char* uuid_characteristic, PROPERTY_FLAGS propertyBmp,
+                     byte valueLength, SECURITY_FLAGS securityBmp, void (*ftListener)(byte*, byte&));
     void setHandle(word handle);
     const char* getUuidService();
     const char* getUuidCharacteristic();
@@ -31,7 +32,7 @@ public:
     byte getValueLength();
     word getHandle();
     byte getSecurityBmp();
-    void callListener(char*data, byte &length);
+    void callListener(byte *data, byte &length);
 private:
     char* cleanupUuid(const char* uuid);
     char* _uuid_service;
@@ -40,7 +41,7 @@ private:
     byte _securityBmp;
     byte _valueLength;
     word _handle;
-    void (*_ftListener)(char*, byte&);
+    void (*_ftListener)(byte*, byte&);
 };
 
 #endif // BTCHARACTERISTIC_H

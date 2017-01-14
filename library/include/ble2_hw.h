@@ -298,7 +298,7 @@ void ble2_start_advertisement(uint16_t interval, uint16_t window_time);
  * the peer device is not saved into NVM. In this situation, the connection is not bonded.
  */
 void ble2_bond(bond_saving_t parameter);
-void ble2_set_passcode(const char* passcode);
+void ble2_set_passcode(unsigned long passcode);
 /**
  * @brief
  * Displays critical information about the current device over the UART.
@@ -467,7 +467,7 @@ void ble2_list_server_services();
  * 16-bit hexadecimal value of the handle, which corresponds to a characteristic of the client service.
  * Users can find a match between the handle and its characteristic UUID using the by listing characteristics and services.
  */
-void ble2_read_characteristic_content(uint16_t handle);
+void ble2_read_client_characteristic_content(uint16_t handle);
 /**
  * @brief
  * Writes the contents of the characteristic in the client service from a remote device by addressing its handle.
@@ -476,7 +476,7 @@ void ble2_read_characteristic_content(uint16_t handle);
  * @param content
  * Content to be written
  */
-void ble2_write_characteristic_content(uint16_t handle, char* content);
+void ble2_write_client_characteristic_content(uint16_t handle, char* content);
 /**
  * @brief
  * Reads the configuration of a characteristic in the client service from a remote device by addressing its UUID.
@@ -518,7 +518,7 @@ void ble2_write_characteristic_content_via_UUID(const char* UUID, const char* co
  * @param handle
  * 16-bit hexadecimal value of the handle, which corresponds to a characteristic of the server service
  */
-void ble2_read_server_characteristic_value_via_handle (uint16_t handle);
+void ble2_read_server_characteristic_content(uint16_t handle);
 /**
  * @brief
  * Writes the contents of the characteristic in the server service to a local device by addressing its handle.
@@ -527,7 +527,7 @@ void ble2_read_server_characteristic_value_via_handle (uint16_t handle);
  * @param content
  * The second parameter is the content to be written to the characteristic
  */
-void ble2_write_server_characteristic_value_via_handle (uint16_t handle, char* content);
+void ble2_write_server_characteristic_content (uint16_t handle, char* content);
 /**
  * @brief
  * Reads the value of the characteristic in the server service on a local device by addressing its UUID.
