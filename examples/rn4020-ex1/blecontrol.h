@@ -18,8 +18,7 @@ public:
         EV_PASSCODE_WANTED,
         EV_PASSCODE_GENERATED,
         EV_CONNECTION_UP,
-        EV_CONNECTION_DOWN,
-        EV_CHARACTERISTIC_VALUE_CHANGED
+        EV_CONNECTION_DOWN
     }EVENT;
     typedef enum    //Starting from FW-version 1.33BEC, only these two services are supported.  Other ones must be created by the user.
     {

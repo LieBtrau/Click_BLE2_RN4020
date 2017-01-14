@@ -47,7 +47,7 @@ void setup() {
     while (!(*sw)) ;
     sw->begin(9600);
     sw->println("I'm ready, folk!");
-    bool modeIsCentral=true;
+    bool modeIsCentral=false;
     char peripheralMac[]="001EC01D03EA";
     ble.setEventListener(bleEvent);
 
@@ -137,9 +137,6 @@ void bleEvent(bleControl::EVENT ev)
     case bleControl::EV_CONNECTION_UP:
         sw->println("Connection up");
         bConnected=true;
-        break;
-    case bleControl::EV_CHARACTERISTIC_VALUE_CHANGED:
-        sw->println("Value of some characteristic changed");
         break;
     default:
         sw->print("Unknown event: ");
