@@ -82,8 +82,14 @@ bool rn4020::begin(unsigned long baudrate)
         //Maybe the module is blocked or set to an unknown baudrate?
         if(!doFactoryDefault())
         {
+#if DEBUG_LEVEL >= DEBUG_ALL
+        sPortDebug->println("Factory default failed.");
+#endif
             return false;
         }
+#if DEBUG_LEVEL >= DEBUG_ALL
+        sPortDebug->println("Factory default ok.");
+#endif
         if(!setBaudrate(2400))
         {
             return false;
@@ -562,7 +568,8 @@ void rn4020::loop()
         resetBuffer();
         return;
     }
-    if(sscanf(rxbuf, "Peer Passcode:%d",&passcode)==1 && _ftPasscodeGenerated)
+    passcode=0;
+    if(sscanf(rxbuf, "Peer Passcode:%6lu", &passcode)==1 && _ftPasscodeGenerated)
     {
         _ftPasscodeGenerated(passcode);
         resetBuffer();
@@ -699,7 +706,13 @@ bool rn4020::setBaudrate(unsigned long baud)
 #endif
         return false;
     }
+#if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
+    //ProTrinket3V has problems communicating at 115200baud.  The "\r\n" won't be received.
+    waitForReply(2000,"AOK");
+    return !strncmp(rxbuf,"AOK",3);
+#else
     return waitForReply(2000,"AOK");
+#endif
 }
 
 bool rn4020::setBluetoothDeviceName(const char* btName)
@@ -845,5 +858,11 @@ bool rn4020::waitForStartup(unsigned long baudrate)
         return false;
     }
     //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART
+#if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
+    //ProTrinket3V has problems communicating at 115200baud.  The "\r\n" won't be received.
+    waitForReply(2000,"CMD");
+    return !strncmp(rxbuf,"CMD",3);
+#else
     return waitForReply(2000,"CMD");
+#endif
 }

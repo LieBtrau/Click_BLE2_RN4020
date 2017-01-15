@@ -3,8 +3,10 @@
 //declaration of needed libraries must be done in the ino-file of the project.
 #include "Arduino.h"
 #if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
-/* Preferably use the USB-connection to program the Protrinket3V.  FTDI programming uses the same UART as the RN4020 is
- * connected on.
+/* Preferably use the USB-connection to program the Protrinket3V.  Connect the Trinket directly to your PC.  Don't use a
+ * USB-hub.
+ * FTDI programming uses the same UART as the RN4020 is connected on.
+ * FTDI connection is easier for debugging, though.  There's no need to push that tiny reset button all the time.
  */
 #include <SoftwareSerial.h>
 SoftwareSerial swPort(A5,A4);//RX, TX

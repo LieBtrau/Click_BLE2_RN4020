@@ -361,7 +361,6 @@ word bleControl::getLocalHandle(btCharacteristic* bt)
 }
 
 
-
 void bleControl::setEventListener(void(*ftEventReceived)(EVENT))
 {
     generateEvent=ftEventReceived;
