@@ -8,7 +8,6 @@
 #include <SoftwareSerial.h>
 extern SoftwareSerial* sw;
 rn4020 rn(Serial,3,4,5,A3);
-SoftwareSerial* sPortDebug;
 /*Connections between ProTrinket3V and RN4020
  * RN4020.1 -> GND
  * RN4020.5 -> RX
@@ -360,7 +359,6 @@ word bleControl::getLocalHandle(btCharacteristic* bt)
     bt->setHandle(handle);
     return handle;
 }
-
 
 
 void bleControl::setEventListener(void(*ftEventReceived)(EVENT))
