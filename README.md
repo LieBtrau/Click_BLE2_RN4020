@@ -10,16 +10,18 @@ MikroElektronika has made a Click-board for this module.  Unfortunately, their M
 
 ## Hardware
 ### BRD161224
-* [Schematic](https://drive.google.com/open?id=0B5_mAlpV8IjvNDhhZ1VFa0pTalE)
-* [Assembly Drawing](https://drive.google.com/open?id=0B5_mAlpV8IjvUFloZ0N6MFRrYnM)
-* [Drill Plan](https://drive.google.com/open?id=0B5_mAlpV8IjvWHlsd1NfR2djTkU)
-* [Films](https://drive.google.com/open?id=0B5_mAlpV8IjvTHRYaU1Lb0hmRk0)
+* [Schematic](https://github.com/LieBtrau/Click_BLE2_RN4020/raw/master/Hardware/BRD161224/doc/BRD161224_R000x_Schematic.pdf)
+* [Assembly Drawing](https://github.com/LieBtrau/Click_BLE2_RN4020/raw/master/Hardware/BRD161224/doc/BRD161224_R00_AssemblyDrawing_top.pdf)
+* [Drill Plan](https://github.com/LieBtrau/Click_BLE2_RN4020/raw/master/Hardware/BRD161224/doc/BRD161224_R00_DrillPlan.pdf)
+* [Film top](https://github.com/LieBtrau/Click_BLE2_RN4020/raw/master/Hardware/BRD161224/doc/BRD161224_R00_Film_top.pdf)
+* [Film bottom](https://github.com/LieBtrau/Click_BLE2_RN4020/raw/master/Hardware/BRD161224/doc/BRD161224_R00_Film_bot.pdf)
 
 ---
 
 ## Software
 
-State: central & peripheral functionality implemented (and tested on Nucleo STM32F103)
+* Central & peripheral functionality implemented (and tested on Nucleo STM32F103).
+* Use of private characteristics
 
-The original MikroE library is far from complete.  It only holds functions to send data to the RN4020.  There's no functionality to parse the response from the RN4020.  
-This library includes a central/peripheral application using private characteristics, implemented for Arduino.
+This library is based on the MikroE library which is far from complete or usable.  It only holds functions to send data to the RN4020.  There's no functionality to parse the response from the RN4020.  
+
