@@ -19,18 +19,35 @@ rn4020 rn(Serial,3,4,5,A3);
  * RN4020.3V3 -> 3V
  */
 #elif defined(ARDUINO_STM_NUCLEO_F103RB)
-/*Connections between Nucleo and RN4020
- * RN4020.1 -> GND
- * RN4020.5 -> D2
- * RN4020.6 -> D8
- * RN4020.7 -> D3
- * RN4020.12 -> D4
- * RN4020.15 -> D5
- * RN4020.PWREN -> D6
- * RN4020.3V3 -> 3V3
+/*Connections between Nucleo and RN4020, on Nucleo Serial2 is connected to the debugger
+ * RN4020.1 (GND)       -> GND
+ * RN4020.5 (TX)        -> D2 (Serial1_RX)
+ * RN4020.6 (RX)        -> D8 (Serial1_TX)
+ * RN4020.7 (WAKE_SW)   -> D3
+ * RN4020.12 (ACT)      -> D4
+ * RN4020.15 (WAKE_HW)  -> D5
+ * RN4020.PWREN         -> D6
+ * RN4020.23 (3V3)      -> 3V3
  */
 rn4020 rn(Serial1, 3, 4, 5, 6);
 extern HardwareSerial* sw;
+#elif defined(ARDUINO_GENERIC_STM32F103C)
+/* Connections between Blue Pill and BLE2 Click
+ * When not using virtual COM-port on USB of BluePill, then RX2/TX2 is Serial1
+ * BLE2.SWK ->  BluePill.PB12
+ * BLE2.RST ->  BluePill.PB13
+ * BLE2.3V3 ->  BluePill.(3.3)
+ * BLE2.GND ->  BluePill.G
+ * BLE2.HWK ->  BluePill.PB14
+ * BLE2.WS  ->  BluePill.PB15
+ * BLE2.TX  ->  BluePill.PA3    (RX2)
+ * BLE2.RX  ->  BluePill.PA2    (TX2)
+ */
+//pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
+rn4020 rn(Serial1, PB12, PB15, PB14, PB13);
+extern HardwareSerial* sw;
+#else
+#error Unsupported target device
 #endif
 
 static void connectionEvent(bool bConnectionUp);

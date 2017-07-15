@@ -7,9 +7,11 @@
 #include <SoftwareSerial.h>
 static SoftwareSerial* sPortDebug;
 extern SoftwareSerial* sw;
-#elif defined(ARDUINO_STM_NUCLEO_F103RB)
+#elif defined(ARDUINO_STM_NUCLEO_F103RB) || defined(ARDUINO_GENERIC_STM32F103C)
 static HardwareSerial* sPortDebug;
 extern HardwareSerial* sw;
+#else
+#error Unsupported target device
 #endif
 
 static HardwareSerial* sPort;
