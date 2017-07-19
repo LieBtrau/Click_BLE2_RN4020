@@ -124,9 +124,9 @@ void rn4020::cyclePower(OPERATING_MODES om)
 {
     digitalWrite(_pinWake_hw_15, LOW);
     digitalWrite(_pinWake_sw_7, LOW);
-    digitalWrite(_pinEnPwr, HIGH);//module OFF
+    digitalWrite(_pinEnPwr, LOW);//module OFF
     delay(100);
-    digitalWrite(_pinEnPwr, LOW);//module ON
+    digitalWrite(_pinEnPwr, HIGH);//module ON
     if(om==OM_NORMAL)
     {
         digitalWrite(_pinWake_sw_7, HIGH);

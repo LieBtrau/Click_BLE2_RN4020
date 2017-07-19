@@ -60,7 +60,7 @@ void setup() {
                                        btCharacteristic::NOTHING);  //security
         if(ble.readRemoteCharacteristic(&serial_number, value, length))
         {
-            sw->print("Serial number of peripheral is: ");
+            sw->print("Serial number of remote peripheral is: ");
             sw->println((char*)value);
         }
         delay(5000);
@@ -84,7 +84,7 @@ void setup() {
                                        btCharacteristic::NOTHING);  //security
         if(ble.readLocalCharacteristic(&serial_number, value, length))
         {
-            sw->print("Serial number of peripheral is: ");
+            sw->print("Serial number of this peripheral is: ");
             sw->println((char*)value);
         }
 
