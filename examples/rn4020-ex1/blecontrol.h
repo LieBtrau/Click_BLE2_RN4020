@@ -2,7 +2,7 @@
 #define BLECONTROL_H
 
 #include "Arduino.h"
-#include "btcharacteristic.h"
+#include "rn4020.h"
 
 class bleControl
 {
@@ -26,14 +26,21 @@ public:
         SRV_BATTERY=0x40000000,
         SRV_USR_PRIV_SERV=0x00000001
     }SERVICES;
-    bleControl(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
-    bool begin(bool bCentral);
+    bleControl(rn4020 *prn);
+    bool init();
+    bool beginCentral();
+    bool programPeripheral();
+    bool programCentral();
+    bool beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
     bool loop(void);
     bool getLocalMacAddress(byte* address, byte& length);
     void setEventListener(void(*ftEventReceived)(EVENT));
     void setPasscode(unsigned long pass);
     bool findUnboundPeripheral(const char *remoteBtAddress);
     unsigned long getPasscode();
+    bool getBluetoothDeviceName(char* btName);
+    bool setBluetoothDeviceName(const char* btName);
+    bool addLocalCharacteristics(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
     bool writeLocalCharacteristic(btCharacteristic* bt, byte value);
     bool writeRemoteCharacteristic(btCharacteristic* bt, byte value);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);

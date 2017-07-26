@@ -1,54 +1,6 @@
 #include "blecontrol.h"
-#include "rn4020.h"
-#include "btcharacteristic.h"
 
 #define DEBUG_LEVEL DEBUG_ALL
-
-#if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
-#include <SoftwareSerial.h>
-extern SoftwareSerial* sw;
-rn4020 rn(Serial,3,4,5,A3);
-/*Connections between ProTrinket3V and RN4020
- * RN4020.1 -> GND
- * RN4020.5 -> RX
- * RN4020.6 -> TX
- * RN4020.7 -> 3
- * RN4020.12 -> 4
- * RN4020.15 -> 5
- * RN4020.PWREN -> A3
- * RN4020.3V3 -> 3V
- */
-#elif defined(ARDUINO_STM_NUCLEO_F103RB)
-/*Connections between Nucleo and RN4020, on Nucleo Serial2 is connected to the debugger
- * RN4020.1 (GND)       -> GND
- * RN4020.5 (TX)        -> D2 (Serial1_RX)
- * RN4020.6 (RX)        -> D8 (Serial1_TX)
- * RN4020.7 (WAKE_SW)   -> D3
- * RN4020.12 (ACT)      -> D4
- * RN4020.15 (WAKE_HW)  -> D5
- * RN4020.PWREN         -> D6
- * RN4020.23 (3V3)      -> 3V3
- */
-rn4020 rn(Serial1, 3, 4, 5, 6);
-extern HardwareSerial* sw;
-#elif defined(ARDUINO_GENERIC_STM32F103C)
-/* Connections between Blue Pill and BLE2 Click
- * When not using virtual COM-port on USB of BluePill, then RX2/TX2 is Serial1
- * BLE2.SWK ->  BluePill.PB12
- * BLE2.RST ->  BluePill.PB13
- * BLE2.3V3 ->  BluePill.(3.3)
- * BLE2.GND ->  BluePill.G
- * BLE2.HWK ->  BluePill.PB14
- * BLE2.WS  ->  BluePill.PB15
- * BLE2.TX  ->  BluePill.PA3    (RX2)
- * BLE2.RX  ->  BluePill.PA2    (TX2)
- */
-//pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
-rn4020 rn(Serial1, PB12, PB15, PB14, PB13);
-extern HardwareSerial* sw;
-#else
-#error Unsupported target device
-#endif
 
 static void connectionEvent(bool bConnectionUp);
 static void bondingEvent(rn4020::BONDING_MODES bd);
@@ -56,151 +8,147 @@ static void advertisementEvent(rn4020::ADVERTISEMENT* adv);
 static void passcodeGeneratedEvent(unsigned long passcode);
 static void characteristicWrittenEvent(word handle, byte* value, byte length);
 
-static unsigned long pass;
-static volatile bool bPassReady=false;
-static volatile bool bIsBonded;
-static bool bIsCentral;
-static void (*generateEvent)(bleControl::EVENT);
+namespace
+{
+unsigned long pass;
+volatile bool bPassReady=false;
+volatile bool bIsBonded;
+bool bIsCentral;
+void (*generateEvent)(bleControl::EVENT);
 
-static volatile char* foundBtAddress=0;
-static btCharacteristic** _localCharacteristics;
-static byte _nrOfCharacteristics;
+volatile char* foundBtAddress=0;
+btCharacteristic** _localCharacteristics=0;
+byte _nrOfCharacteristics=0;
+rn4020 *rn;
+}
 
-
-bleControl::bleControl(btCharacteristic** localCharacteristics, byte nrOfCharacteristics)
+bleControl::bleControl(rn4020* prn)
 {
     bIsBonded=false;
     generateEvent=0;
-    _localCharacteristics=localCharacteristics;
-    _nrOfCharacteristics=nrOfCharacteristics;
-
+    rn=prn;
 }
 
 //Set up the RN4020 module
-bool bleControl::begin(bool bCentral)
+bool bleControl::init()
 {
-    char dataname[20];
-    const char BT_NAME_KEYFOB[]="AiakosKeyFob";
-    const char BT_NAME_BIKE[]="AiakosBike";
-
-    bIsCentral=bCentral;
     //Switch to 2400baud
     // + It's more reliable than 115200baud with the ProTrinket 3V.
     // + It also works when the module is in deep sleep mode.
-    if(!rn.begin(2400))
+    if(!rn->begin(2400))
     {
         return false;
     }
-    rn.setConnectionListener(connectionEvent);
-    rn.setBondingListener(bondingEvent);
-    //Check if settings have already been done.  If yes, we don't have to set them again.
-    //This is check is performed by verifying if the last setting command has finished successfully:
-    if(!rn.getBluetoothDeviceName(dataname))
+    rn->setConnectionListener(connectionEvent);
+    rn->setBondingListener(bondingEvent);
+    return true;
+}
+
+bool bleControl::programPeripheral()
+{
+    //Enable authentication with Keyboard and display as IO-capabilities
+    //Server only (services will only be served, no client functionalities)
+    if(!rn->setFeatures(FR_AUTH_KEYB_DISP | FR_SERV_ONLY))
     {
         return false;
     }
-    if(bCentral)
+    //Services: Device Information + Battery Level + user defined private services
+    if(!rn->setServices(SRV_BATTERY | SRV_DEVICE_INFO | SRV_USR_PRIV_SERV))
     {
-        //Central
-        if(strncmp(dataname,BT_NAME_BIKE, strlen(BT_NAME_BIKE)))
-        {
-            //Module not yet correctly configured
-
-            //Services: Device Information + Battery Level services
-            if(!rn.setServices(SRV_BATTERY | SRV_DEVICE_INFO))
-            {
-                return false;
-            }
-            //Central role
-            //Enable authentication with Keyboard and display as IO-capabilities
-            if(!rn.setFeatures(FR_CENTRAL | FR_AUTH_KEYB_DISP))
-            {
-                return false;
-            }
-            if(!rn.setBluetoothDeviceName(BT_NAME_BIKE))
-            {
-                return false;
-            }
-            //Settings only become active after resetting the module.
-            rn.doReboot(2400);
-            if(!rn.doReboot(2400))
-            {
-                return false;
-            }
-        }
-        rn.setAdvertisementListener(advertisementEvent);
-        rn.setBondingPasscodeListener(passcodeGeneratedEvent);
-        return rn.setOperatingMode(rn4020::OM_NORMAL);
-    }else
+        return false;
+    }
+    if(!rn->setTxPower(0))
     {
-        //Peripheral
-        if(strncmp(dataname,BT_NAME_KEYFOB, strlen(BT_NAME_KEYFOB)))
-        {
-            //Module not yet correctly configured
+        return false;
+    }
+    return true;
+}
 
-            //Enable authentication with Keyboard and display as IO-capabilities
-            //Server only (services will only be served, no client functionalities)
-            if(!rn.setFeatures(FR_AUTH_KEYB_DISP | FR_SERV_ONLY))
-            {
-                return false;
-            }
-            //Services: Device Information + Battery Level + user defined private services
-            if(!rn.setServices(SRV_BATTERY | SRV_DEVICE_INFO | SRV_USR_PRIV_SERV))
-            {
-                return false;
-            }
-            if(!rn.setTxPower(0))
-            {
-                return false;
-            }
-            if(!rn.doRemovePrivateCharacteristics())
-            {
-                return false;
-            }
-            //Power must be cycled after removing private characteristics
-            if(!rn.begin(2400))
-            {
-                return false;
-            }
-            for(byte i=0;i<_nrOfCharacteristics;i++)
-            {
-                if((!rn.doAddService(_localCharacteristics[i])) || (!rn.doAddCharacteristic(_localCharacteristics[i])))
-                {
-                    return false;
-                }
-            }
-            if(!rn.setBluetoothDeviceName(BT_NAME_KEYFOB))
-            {
-                return false;
-            }
-            //Settings only become active after resetting the module.
-            //Created characteristics only become available after reboot.
-            if(!rn.doReboot(2400))
-            {
-                return false;
-            }
-        }
-        rn.doUpdateHandles(_localCharacteristics, _nrOfCharacteristics);
-        rn.setCharacteristicWrittenListener(characteristicWrittenEvent);
-        //Start advertizing to make the RN4020 discoverable & connectable
-        //Auto-advertizing is not used, because it doesn't allow for setting the advertisement interval
-        if(!rn.doAdvertizing(true,5000))
+bool bleControl::programCentral()
+{
+    //Services: Device Information + Battery Level services
+    if(!rn->setServices(SRV_BATTERY | SRV_DEVICE_INFO))
+    {
+        return false;
+    }
+    //Central role
+    //Enable authentication with Keyboard and display as IO-capabilities
+    if(!rn->setFeatures(FR_CENTRAL | FR_AUTH_KEYB_DISP))
+    {
+        return false;
+    }
+    return true;
+}
+
+bool bleControl::beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics)
+{
+    bIsCentral=false;
+    //Reboot is needed to activate previously programmed settings.
+    if(!rn->doReboot(2400))
+    {
+        return false;
+    }
+    _localCharacteristics=localCharacteristics;
+    _nrOfCharacteristics=nrOfCharacteristics;
+    rn->doUpdateHandles(_localCharacteristics, _nrOfCharacteristics);
+    rn->setCharacteristicWrittenListener(characteristicWrittenEvent);
+    //Start advertizing to make the RN4020 discoverable & connectable
+    //Auto-advertizing is not used, because it doesn't allow for setting the advertisement interval
+    if(!rn->doAdvertizing(true,5000))
+    {
+        return false;
+    }
+    return rn->setOperatingMode(rn4020::OM_DEEP_SLEEP);
+}
+
+bool bleControl::beginCentral()
+{
+    bIsCentral=true;
+    //Reboot is needed to activate previously programmed settings.
+    if(!rn->doReboot(2400))
+    {
+        return false;
+    }
+    rn->setAdvertisementListener(advertisementEvent);
+    rn->setBondingPasscodeListener(passcodeGeneratedEvent);
+    return rn->setOperatingMode(rn4020::OM_NORMAL);
+}
+
+
+
+bool bleControl::addLocalCharacteristics(btCharacteristic **localCharacteristics, byte nrOfCharacteristics)
+{
+    _localCharacteristics=localCharacteristics;
+    _nrOfCharacteristics=nrOfCharacteristics;
+
+    if(!rn->doRemovePrivateCharacteristics())
+    {
+        return false;
+    }
+    //Power must be cycled after removing private characteristics
+    if(!rn->begin(2400))
+    {
+        return false;
+    }
+    for(byte i=0;i<_nrOfCharacteristics;i++)
+    {
+        if((!rn->doAddService(_localCharacteristics[i])) || (!rn->doAddCharacteristic(_localCharacteristics[i])))
         {
             return false;
         }
-        return rn.setOperatingMode(rn4020::OM_DEEP_SLEEP);
     }
-
+    //doUpdateHandles must be called after this function.
 }
+
 
 void bleControl::disconnect()
 {
-    rn.doDisconnect();
+    rn->doDisconnect();
 }
 
 bool bleControl::loop()
 {
-    rn.loop();
+    rn->loop();
 }
 
 bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
@@ -209,14 +157,14 @@ bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
     bool bonded;
 
     //Unbound first, otherwise the bonded module can't be found by a scan
-    if(rn.isBonded(bonded) && bonded)
+    if(rn->isBonded(bonded) && bonded)
     {
-        rn.doRemoveBond();
+        rn->doRemoveBond();
     }
     char** macList;
     byte nrOfItems;
     //Start search
-    if(!rn.doFindRemoteDevices(macList, nrOfItems, 6000))
+    if(!rn->doFindRemoteDevices(macList, nrOfItems, 6000))
     {
         return false;
     }
@@ -242,17 +190,17 @@ bool bleControl::secureConnect(const char* remoteBtAddress)
         switch(state)
         {
         case ST_NOTCONNECTED:
-            if(!rn.doConnecting(remoteBtAddress))
+            if(!rn->doConnecting(remoteBtAddress))
             {
                 //stop connecting process
-                rn.doStopConnecting();
+                rn->doStopConnecting();
                 return false;
             }
             delay(1000);
             bPassReady=false;
-            if(!rn.startBonding())
+            if(!rn->startBonding())
             {
-                rn.doDisconnect();
+                rn->doDisconnect();
                 return false;
             }
             ulStartTime=millis();
@@ -286,9 +234,9 @@ bool bleControl::secureConnect(const char* remoteBtAddress)
             }
             break;
         case ST_PROV_BONDED:
-            if(!rn.startBonding())
+            if(!rn->startBonding())
             {
-                rn.doDisconnect();
+                rn->doDisconnect();
                 return false;
             }
             state=ST_BONDED;
@@ -297,6 +245,17 @@ bool bleControl::secureConnect(const char* remoteBtAddress)
 
 }
 
+bool bleControl::getBluetoothDeviceName(char* btName)
+{
+    return rn->getBluetoothDeviceName(btName);
+}
+
+bool bleControl::setBluetoothDeviceName(const char* btName)
+{
+    return rn->setBluetoothDeviceName(btName);
+}
+
+
 unsigned long bleControl::getPasscode()
 {
     return pass;
@@ -304,7 +263,7 @@ unsigned long bleControl::getPasscode()
 
 void bleControl::setPasscode(unsigned long pass)
 {
-    rn.setBondingPasscode(pass);
+    rn->setBondingPasscode(pass);
 }
 
 bool bleControl::writeLocalCharacteristic(btCharacteristic *bt, byte value)
@@ -314,7 +273,7 @@ bool bleControl::writeLocalCharacteristic(btCharacteristic *bt, byte value)
     {
         return false;
     }
-    return rn.doWriteLocalCharacteristic(handle,&value,1);
+    return rn->doWriteLocalCharacteristic(handle,&value,1);
 }
 
 bool bleControl::writeRemoteCharacteristic(btCharacteristic *bt, byte value)
@@ -324,7 +283,7 @@ bool bleControl::writeRemoteCharacteristic(btCharacteristic *bt, byte value)
     {
         return false;
     }
-    return rn.doWriteRemoteCharacteristic(handle,&value,1);
+    return rn->doWriteRemoteCharacteristic(handle,&value,1);
 }
 
 bool bleControl::readRemoteCharacteristic(btCharacteristic *bt, byte* value, byte& length)
@@ -334,7 +293,7 @@ bool bleControl::readRemoteCharacteristic(btCharacteristic *bt, byte* value, byt
     {
         return false;
     }
-    return rn.doReadRemoteCharacteristic(handle, value, length);
+    return rn->doReadRemoteCharacteristic(handle, value, length);
 }
 
 bool bleControl::readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length)
@@ -344,13 +303,13 @@ bool bleControl::readLocalCharacteristic(btCharacteristic *bt, byte* value, byte
     {
         return false;
     }
-    return rn.doReadLocalCharacteristic(handle, value, length);
+    return rn->doReadLocalCharacteristic(handle, value, length);
 }
 
 
 bool bleControl::getLocalMacAddress(byte* address, byte& length)
 {
-    return rn.getMacAddress(address, length);
+    return rn->getMacAddress(address, length);
 }
 
 word bleControl::getRemoteHandle(btCharacteristic* bt)
@@ -360,7 +319,7 @@ word bleControl::getRemoteHandle(btCharacteristic* bt)
     {
         return handle;
     }
-    handle=rn.getRemoteHandle(bt);
+    handle=rn->getRemoteHandle(bt);
     bt->setHandle(handle);
     return handle;
 }
@@ -372,7 +331,7 @@ word bleControl::getLocalHandle(btCharacteristic* bt)
     {
         return handle;
     }
-    handle=rn.getLocalHandle(bt);
+    handle=rn->getLocalHandle(bt);
     bt->setHandle(handle);
     return handle;
 }
@@ -430,7 +389,7 @@ void connectionEvent(bool bConnectionUp)
         if(!bIsCentral)
         {
             //After connection goes down, advertizing must be restarted or the module will no longer be connectable.
-            if(!rn.doAdvertizing(true,5000))
+            if(!rn->doAdvertizing(true,5000))
             {
                 return;
             }

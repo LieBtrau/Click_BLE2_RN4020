@@ -1,4 +1,47 @@
-#include "rn4020-ex1.h"
+#include "blecontrol.h"
+#include "debug.h"
+
+#if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
+rn4020 rn(Serial,3,4,5,A3);
+/*Connections between ProTrinket3V and RN4020
+ * RN4020.1 -> GND
+ * RN4020.5 -> RX
+ * RN4020.6 -> TX
+ * RN4020.7 -> 3
+ * RN4020.12 -> 4
+ * RN4020.15 -> 5
+ * RN4020.PWREN -> A3
+ * RN4020.3V3 -> 3V
+ */
+#elif defined(ARDUINO_STM_NUCLEO_F103RB)
+/*Connections between Nucleo and RN4020, on Nucleo Serial2 is connected to the debugger
+ * RN4020.1 (GND)       -> GND
+ * RN4020.5 (TX)        -> D2 (Serial1_RX)
+ * RN4020.6 (RX)        -> D8 (Serial1_TX)
+ * RN4020.7 (WAKE_SW)   -> D3
+ * RN4020.12 (ACT)      -> D4
+ * RN4020.15 (WAKE_HW)  -> D5
+ * RN4020.PWREN         -> D6
+ * RN4020.23 (3V3)      -> 3V3
+ */
+rn4020 rn(Serial1, 3, 4, 5, 6);
+#elif defined(ARDUINO_GENERIC_STM32F103C)
+/* Connections between Blue Pill and BLE2 Click
+ * When not using virtual COM-port on USB of BluePill, then RX2/TX2 is Serial1
+ * BLE2.SWK ->  BluePill.PB12
+ * BLE2.RST ->  BluePill.PB13
+ * BLE2.3V3 ->  BluePill.(3.3)
+ * BLE2.GND ->  BluePill.G
+ * BLE2.HWK ->  BluePill.PB14
+ * BLE2.WS  ->  BluePill.PB15
+ * BLE2.TX  ->  BluePill.PA3    (RX2)
+ * BLE2.RX  ->  BluePill.PA2    (TX2)
+ */
+//pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
+rn4020 rn(Serial1, PB12, PB15, PB14, PB13);
+#else
+#error Unsupported target device
+#endif
 
 static void alertLevelEvent(byte *value, byte& length);
 
@@ -18,28 +61,23 @@ static btCharacteristic ias_alertLevel("1802",                                  
 uint32_t ulStartTime;
 bool bConnected;
 btCharacteristic* _localCharacteristics[2]={&rfid_key, &ias_alertLevel};
-bleControl ble(_localCharacteristics,2);
+bleControl ble(&rn);
 
 void setup() {
     ulStartTime=millis();
-    while (!(*sw)) ;
-    sw->begin(9600);
-    sw->println("I'm ready, folk!");
+    openDebug();
+    debug_println("I'm ready, folk!");
     bool modeIsCentral=false;
     char peripheralMac[]="001EC01D03EA";
     ble.setEventListener(bleEvent);
+    initBlePeripheral();
 
-    if(!ble.begin(modeIsCentral))
-    {
-        sw->println("RN4020 not set up");
-        return;
-    }
 
     if(modeIsCentral)
     {
         if(!ble.findUnboundPeripheral(peripheralMac))
         {
-            sw->println("Remote peer not found");
+            debug_println("Remote peer not found");
             return;
         }
         if(!ble.secureConnect(peripheralMac))
@@ -60,8 +98,8 @@ void setup() {
                                        btCharacteristic::NOTHING);  //security
         if(ble.readRemoteCharacteristic(&serial_number, value, length))
         {
-            sw->print("Serial number of remote peripheral is: ");
-            sw->println((char*)value);
+            debug_print("Serial number of remote peripheral is: ");
+            debug_println((char*)value);
         }
         delay(5000);
         ble.disconnect();
@@ -84,8 +122,8 @@ void setup() {
                                        btCharacteristic::NOTHING);  //security
         if(ble.readLocalCharacteristic(&serial_number, value, length))
         {
-            sw->print("Serial number of this peripheral is: ");
-            sw->println((char*)value);
+            debug_print("Serial number of this peripheral is: ");
+            debug_println((char*)value);
         }
 
     }
@@ -101,35 +139,98 @@ void bleEvent(bleControl::EVENT ev)
     switch(ev)
     {
     case bleControl::EV_PASSCODE_WANTED:
-        sw->println("Let's guess that the passcode is 123456");
+        debug_println("Let's guess that the passcode is 123456");
         ble.setPasscode(123456);
         break;
     case bleControl::EV_PASSCODE_GENERATED:
-        sw->print("Peripheral must set PASS: ");
-        sw->println(ble.getPasscode(), DEC);
+        debug_print("Peripheral must set PASS: ");
+        debug_println(ble.getPasscode(), DEC);
         break;
     case bleControl::EV_CONNECTION_DOWN:
-        sw->println("Connection down");
+        debug_println("Connection down");
         bConnected=false;
         break;
     case bleControl::EV_CONNECTION_UP:
-        sw->println("Connection up");
+        debug_println("Connection up");
         bConnected=true;
         break;
     default:
-        sw->print("Unknown event: ");
-        sw->println(ev, DEC);
+        debug_print("Unknown event: ");
+        debug_println(ev, DEC);
         break;
     }
 }
 
 void alertLevelEvent(byte* value, byte &length)
 {
-    sw->print("Characteristic changed to: ");
+    debug_print("Characteristic changed to: ");
     for(byte i=0;i<length;i++)
     {
-        sw->print(value[i], HEX);
-        sw->print(" ");
+        debug_print(value[i], HEX);
+        debug_print(" ");
     }
-    sw->println();
+    debug_println();
+}
+
+bool initBlePeripheral()
+{
+    char dataname[20];
+    const char BT_NAME_KEYFOB[]="AiakosKeyFob";
+
+    if(!ble.init())
+    {
+        debug_println("RN4020 not set up");
+        return false;
+    }
+    if(!ble.getBluetoothDeviceName(dataname))
+    {
+        return false;
+    }
+    //Check if programming the settings has already been done.  If yes, we don't have to set them again.
+    //This is check is performed by verifying if the last setting command has finished successfully:
+    if(strncmp(dataname,BT_NAME_KEYFOB, strlen(BT_NAME_KEYFOB)))
+    {
+        //Module not yet correctly configured
+        if(!ble.programPeripheral())
+        {
+            return false;
+        }
+        if(!ble.addLocalCharacteristics(_localCharacteristics,2))
+        {
+            return false;
+        }
+        if(!ble.setBluetoothDeviceName(BT_NAME_KEYFOB))
+        {
+            return false;
+        }
+    }
+    return ble.beginPeripheral(_localCharacteristics,2);
+}
+
+bool initBleCentral()
+{
+    char dataname[20];
+    const char BT_NAME_BIKE[]="AiakosBike";
+    if(!ble.init())
+    {
+        debug_println("RN4020 not set up");
+        return false;
+    }
+    if(!ble.getBluetoothDeviceName(dataname))
+    {
+        return false;
+    }
+    if(strncmp(dataname,BT_NAME_BIKE, strlen(BT_NAME_BIKE)))
+    {
+        //Module not yet correctly configured
+        if(!ble.programCentral())
+        {
+            return false;
+        }
+        if(!ble.setBluetoothDeviceName(BT_NAME_BIKE))
+        {
+            return false;
+        }
+    }
+    return ble.beginCentral();
 }

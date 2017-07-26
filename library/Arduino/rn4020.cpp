@@ -1,18 +1,6 @@
 ﻿#include "rn4020.h"
 #include "ble2_hw.h"
-
-#define DEBUG_LEVEL DEBUG_ALL
-
-#if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
-#include <SoftwareSerial.h>
-static SoftwareSerial* sPortDebug;
-extern SoftwareSerial* sw;
-#elif defined(ARDUINO_STM_NUCLEO_F103RB) || defined(ARDUINO_GENERIC_STM32F103C)
-static HardwareSerial* sPortDebug;
-extern HardwareSerial* sw;
-#else
-#error Unsupported target device
-#endif
+#include "debug.h"
 
 static HardwareSerial* sPort;
 const byte BUFFSIZE=250;
@@ -22,24 +10,20 @@ static byte indexRxBuf=0;
 void UART_Wr_Ptr(char _data)
 {
     sPort->write(_data);
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->println(_data);
-#endif
+    debug_println(_data);
 }
 
 void UART_Write_Text(const char *_data)
 {
     sPort->print(_data);
-#if DEBUG_LEVEL >= DEBUG_ALL
     if(!strlen(_data))
     {
-        sPortDebug->print("Empty tx msg");
+        debug_print("Empty tx msg");
     }else
     {
-        sPortDebug->print("\r\nTX: ");
-        sPortDebug->println(_data);
+        debug_print("\r\nTX: ");
+        debug_println(_data);
     }
-#endif
 }
 
 rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr):
@@ -54,7 +38,6 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _ftPasscodeGenerated(0)
 {
     sPort=&s;
-    sPortDebug=sw;
     ble2_hal_init();
 }
 
@@ -84,14 +67,10 @@ bool rn4020::begin(unsigned long baudrate)
         //Maybe the module is blocked or set to an unknown baudrate?
         if(!doFactoryDefault())
         {
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("Factory default failed.");
-#endif
+            debug_println("Factory default failed.");
             return false;
         }
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("Factory default ok.");
-#endif
+        debug_println("Factory default ok.");
         if(!setBaudrate(2400))
         {
             return false;
@@ -175,9 +154,7 @@ bool rn4020::doFactoryDefault()
 {
     setOperatingMode(OM_NORMAL);
     delay(200);
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->println("Forcing factory default.");
-#endif
+    debug_println("Forcing factory default.");
     for(byte i=0;i<8;i++)
     {
         digitalWrite(_pinWake_hw_15, HIGH);
@@ -468,23 +445,19 @@ bool rn4020::gotLine()
         }
     }
     static char b=0,d=0;
-#if DEBUG_LEVEL >= DEBUG_ALL
     if(b==0 && d==0)
     {
-        sPortDebug->print("\r\nRX: ");
+        debug_print("\r\nRX: ");
     }
     if(c>27)
     {
-        sPortDebug->print(c);
+        debug_print(c);
     }
-#endif
     b=d;
     d=c;
     if(b=='\r' && d=='\n')
     {
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->print("\r\nRX: ");
-#endif
+        debug_print("\r\nRX: ");
         return true;
     }
     return false;
@@ -519,9 +492,7 @@ bool rn4020::isModuleActive(unsigned long uiTimeout)
         //Typically pin12 comes high 1.28s after powerup.
         if(millis()>ulStartTime+uiTimeout)
         {
-#if DEBUG_LEVEL >= DEBUG_ALL
-            sPortDebug->println("Module doesn't become active");
-#endif
+            debug_println("Module doesn't become active");
             return false;
         }
     }
@@ -578,16 +549,14 @@ void rn4020::loop()
         return;
     }
     //If no matching string found
-#if DEBUG_LEVEL >= DEBUG_ALL
-    sPortDebug->print("Unknown input: ");
-    sPortDebug->println(rxbuf);
+    debug_print("Unknown input: ");
+    debug_println(rxbuf);
     byte i=0;
     while(rxbuf[i])
     {
-        sPortDebug->print(rxbuf[i++], HEX);
-        sPortDebug->print(" ");
+        debug_print(rxbuf[i++], HEX);
+        debug_print(" ");
     }
-#endif
 }
 
 //The format of the scan result is:
@@ -703,9 +672,7 @@ bool rn4020::setBaudrate(unsigned long baud)
         ble2_set_baud_rate(BR_921600);
         break;
     default:
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("Unknown baud rate");
-#endif
+        debug_println("Unknown baud rate");
         return false;
     }
 #if defined(ARDUINO_AVR_PROTRINKET3FTDI) || defined(ARDUINO_AVR_PROTRINKET3)
@@ -831,9 +798,7 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     resetBuffer();
     if(!pattern || !strlen(pattern))
     {
-#if DEBUG_LEVEL >= DEBUG_ALL
-        sPortDebug->println("No pattern defined");
-#endif
+        debug_println("No pattern defined");
         return false;
     }
     unsigned long ulStartTime=millis();
