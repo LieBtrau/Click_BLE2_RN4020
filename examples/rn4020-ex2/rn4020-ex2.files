@@ -1,7 +1,7 @@
 blecontrol.cpp
 blecontrol.h
-rn4020-ex1.ino
-rn4020-ex1.h
+rn4020-ex2.ino
+rn4020-ex2.h
 ../../library/Arduino/ble2_hal.c
 ../../library/Arduino/ble2_hal.h
 ../../library/Arduino/ble2_hw.c

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 3.5.1, 2017-07-28T19:41:08. -->
+<!-- Written by QtCreator 3.5.1, 2017-07-28T19:47:38. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -69,7 +69,7 @@
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-      <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--verify --board adafruit:avr:protrinket3 --pref target_package=adafruit --pref build.path=$HOME/build --pref target_platform=avr --pref board=protrinket3 $HOME/git/Click_BLE2_RN4020/examples/rn4020-ex1/rn4020-ex1.ino --verbose</value>
+      <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--verify --board adafruit:avr:protrinket3 --pref target_package=adafruit --pref build.path=$HOME/build --pref target_platform=avr --pref board=protrinket3 $HOME/git/Click_BLE2_RN4020/examples/rn4020-ex2/rn4020-ex2.ino --verbose</value>
       <value type="QString" key="ProjectExplorer.ProcessStep.Command">$HOME/Downloads/arduino-1.6.9/arduino</value>
       <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">%{buildDir}</value>
       <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
@@ -194,7 +194,7 @@
     </valuelist>
     <value type="QString" key="BareMetal.CustomRunConfig.Executable"></value>
     <value type="QString" key="BareMetal.RunConfig.WorkingDirectory"></value>
-    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">rn4020-ex1 (via GDB server or hardware debugger)</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">rn4020-ex2 (via GDB server or hardware debugger)</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">BareMetal.CustomRunConfig</value>
     <value type="QString" key="Qt4ProjectManager.MaemoRunConfiguration.Arguments"></value>
@@ -223,7 +223,7 @@
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-      <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--verify --board Arduino_STM32:STM32F1:nucleo_f103rb --pref target_package=Arduino_STM32 --pref build.path=$HOME/build --pref target_platform=STM32F1 --pref board=nucleo_f103rb $HOME/git/Click_BLE2_RN4020/examples/rn4020-ex1/rn4020-ex1.ino --verbose</value>
+      <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--verify --board Arduino_STM32:STM32F1:nucleo_f103rb --pref target_package=Arduino_STM32 --pref build.path=$HOME/build --pref target_platform=STM32F1 --pref board=nucleo_f103rb $HOME/git/Click_BLE2_RN4020/examples/rn4020-ex2/rn4020-ex2.ino --verbose</value>
       <value type="QString" key="ProjectExplorer.ProcessStep.Command">$HOME/Downloads/arduino-1.6.9/arduino</value>
       <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">%{buildDir}</value>
       <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
@@ -347,7 +347,7 @@
     </valuelist>
     <value type="QString" key="BareMetal.CustomRunConfig.Executable">/home/ctack/build/rn4020-ex1.ino.elf</value>
     <value type="QString" key="BareMetal.RunConfig.WorkingDirectory">/home/ctack/build</value>
-    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">rn4020-ex1 (via GDB server or hardware debugger)</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">rn4020-ex2 (via GDB server or hardware debugger)</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">BareMetal.CustomRunConfig</value>
     <value type="QString" key="Qt4ProjectManager.MaemoRunConfiguration.Arguments"></value>
@@ -376,7 +376,7 @@
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-      <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--verify --board Arduino_STM32:STM32F1:genericSTM32F103C --pref target_package=Arduino_STM32 --pref build.path=$HOME/build --pref target_platform=STM32F1 --pref board=genericSTM32F103C --pref custom_device_variant=genericSTM32F103C_STM32F103C8 --pref custom_cpu_speed=genericSTM32F103C_speed_72mhz --pref custom_upload_method=genericSTM32F103C_serialMethod $HOME/git/Click_BLE2_RN4020/examples/rn4020-ex1/rn4020-ex1.ino --verbose</value>
+      <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--verify --board Arduino_STM32:STM32F1:genericSTM32F103C --pref target_package=Arduino_STM32 --pref build.path=$HOME/build --pref target_platform=STM32F1 --pref board=genericSTM32F103C --pref custom_device_variant=genericSTM32F103C_STM32F103C8 --pref custom_cpu_speed=genericSTM32F103C_speed_72mhz --pref custom_upload_method=genericSTM32F103C_serialMethod $HOME/git/Click_BLE2_RN4020/examples/rn4020-ex2/rn4020-ex2.ino --verbose</value>
       <value type="QString" key="ProjectExplorer.ProcessStep.Command">$HOME/Downloads/arduino-1.6.9/arduino</value>
       <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">%{buildDir}</value>
       <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
@@ -498,9 +498,9 @@
      <value type="int">13</value>
      <value type="int">14</value>
     </valuelist>
-    <value type="QString" key="BareMetal.CustomRunConfig.Executable">/home/ctack/build/rn4020-ex1.ino.elf</value>
+    <value type="QString" key="BareMetal.CustomRunConfig.Executable">/home/ctack/build/rn4020-ex2.ino.elf</value>
     <value type="QString" key="BareMetal.RunConfig.WorkingDirectory">/home/ctack/build</value>
-    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">rn4020-ex1 (via GDB server or hardware debugger)</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">rn4020-ex2 (via GDB server or hardware debugger)</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">BareMetal.CustomRunConfig</value>
     <value type="QString" key="Qt4ProjectManager.MaemoRunConfiguration.Arguments"></value>

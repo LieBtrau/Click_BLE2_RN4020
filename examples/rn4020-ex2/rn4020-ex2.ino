@@ -58,37 +58,50 @@ static btCharacteristic ias_alertLevel("1802",                                  
                                        btCharacteristic::NOTHING,                //security
                                        alertLevelEvent);
 
-uint32_t ulStartTime;
+namespace
+{
 bool bConnected;
 btCharacteristic* _localCharacteristics[2]={&rfid_key, &ias_alertLevel};
 bleControl ble(&rn);
+}
 
 void setup() {
-    ulStartTime=millis();
     openDebug();
     debug_println("I'm ready, folk!");
     char peripheralMac[]="001EC01D03EA";
     ble.setEventListener(bleEvent);
-    initBlePeripheral();
+    initBleCentral();
 
-
-    //Example of writing a local characteristic
-    if(!ble.writeLocalCharacteristic(&ias_alertLevel,12))
+    if(!ble.findUnboundPeripheral(peripheralMac))
+    {
+        debug_println("Remote peer not found");
+        return;
+    }
+    if(!ble.secureConnect(peripheralMac))
     {
         return;
     }
-    //Example of reading a local characteristic
+    //Example of writing a characterictic
+    if(!ble.writeRemoteCharacteristic(&ias_alertLevel,1))
+    {
+        return;
+    }
+    //Example of reading a remote characteristic
     byte value[20];
     byte length;
     btCharacteristic serial_number("180A",                      //Device Information Service
                                    "2A25",                      //Serial Number String
                                    btCharacteristic::READ, 20,  //properties+length
                                    btCharacteristic::NOTHING);  //security
-    if(ble.readLocalCharacteristic(&serial_number, value, length))
+    if(ble.readRemoteCharacteristic(&serial_number, value, length))
     {
-        debug_print("Serial number of this peripheral is: ");
+        debug_print("Serial number of remote peripheral is: ");
         debug_println((char*)value);
     }
+    delay(5000);
+    ble.disconnect();
+    delay(5000);
+    ble.secureConnect(peripheralMac);
 }
 
 void loop() {
@@ -133,3 +146,32 @@ void alertLevelEvent(byte* value, byte &length)
     }
     debug_println();
 }
+
+bool initBleCentral()
+{
+    char dataname[20];
+    const char BT_NAME_BIKE[]="AiakosBike";
+    if(!ble.init())
+    {
+        debug_println("RN4020 not set up");
+        return false;
+    }
+    if(!ble.getBluetoothDeviceName(dataname))
+    {
+        return false;
+    }
+    if(strncmp(dataname,BT_NAME_BIKE, strlen(BT_NAME_BIKE)))
+    {
+        //Module not yet correctly configured
+        if(!ble.programCentral())
+        {
+            return false;
+        }
+        if(!ble.setBluetoothDeviceName(BT_NAME_BIKE))
+        {
+            return false;
+        }
+    }
+    return ble.beginCentral();
+}
+
