@@ -133,3 +133,39 @@ void alertLevelEvent(byte* value, byte &length)
     }
     debug_println();
 }
+
+bool initBlePeripheral()
+{
+    char dataname[20];
+    const char BT_NAME_KEYFOB[]="AiakosKeyFob";
+
+    if(!ble.init())
+    {
+        debug_println("RN4020 not set up");
+        return false;
+    }
+    if(!ble.getBluetoothDeviceName(dataname))
+    {
+        return false;
+    }
+    //Check if programming the settings has already been done.  If yes, we don't have to set them again.
+    //This is check is performed by verifying if the last setting command has finished successfully:
+    if(strncmp(dataname,BT_NAME_KEYFOB, strlen(BT_NAME_KEYFOB)))
+    {
+        //Module not yet correctly configured
+        if(!ble.programPeripheral())
+        {
+            return false;
+        }
+        if(!ble.addLocalCharacteristics(_localCharacteristics,2))
+        {
+            return false;
+        }
+        if(!ble.setBluetoothDeviceName(BT_NAME_KEYFOB))
+        {
+            return false;
+        }
+    }
+    return ble.beginPeripheral(_localCharacteristics,2);
+}
+
