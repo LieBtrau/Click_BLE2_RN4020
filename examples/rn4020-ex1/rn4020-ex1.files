@@ -14,8 +14,6 @@ rn4020-ex1.h
 ../../library/include/ble2_hw.h
 ../../library/src/ble2_hal.c
 ../../library/src/ble2_hw.c
-../../library/Arduino/debug.h
-../../library/Arduino/debug.cpp
 ../../library/Arduino/blecontrol.cpp
 ../../library/Arduino/blecontrol.h
 
