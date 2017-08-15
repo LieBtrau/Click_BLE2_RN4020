@@ -4,7 +4,6 @@
 
 static HardwareSerial* sPort;
 const byte BUFFSIZE=250;
-static char rxbuf[BUFFSIZE];
 static byte indexRxBuf=0;
 
 void UART_Wr_Ptr(char _data)
@@ -37,6 +36,7 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _ftCharacteristicWritten(0),
     _ftPasscodeGenerated(0)
 {
+    rxbuf=(char*)malloc(BUFFSIZE);
     sPort=&s;
     ble2_hal_init();
 }
@@ -60,6 +60,10 @@ bool rn4020::begin(unsigned long baudrate)
     pinMode(_pinWake_hw_15, OUTPUT);
     pinMode(_pinWake_sw_7, OUTPUT);
     pinMode(_pinActive_12, INPUT);
+    if(!rxbuf)
+    {
+        return false;
+    }
     //Establish UART communication with module
     cyclePower(OM_NORMAL);
     if(!waitForStartup(baudrate))
@@ -126,9 +130,11 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
     return waitForReply(2000,"AOK");
 }
 
-bool rn4020::doConnecting(const char* remoteBtAddress)
+bool rn4020::doConnecting(const byte* remoteBtAddress)
 {
-    if(ble2_start_connection(PUBLIC_ADDRESS, remoteBtAddress)!=0)
+    char strAddress[13];
+    array2hex(remoteBtAddress, strAddress, 6);
+    if(ble2_start_connection(PUBLIC_ADDRESS, strAddress)!=0)
     {
         return false;
     }
@@ -175,9 +181,10 @@ bool rn4020::doFactoryDefault()
  * Bonded (but unconnected) devices will send directed advertisements (unless configured otherwise with "SR")
  * Devices sending directed advertisements will not be listed.
  */
-bool rn4020::doFindRemoteDevices(char** &macList, byte& nrOfItems, unsigned long timeout)
+bool rn4020::doFindRemoteDevices(byte** &macList, byte& nrOfItems, unsigned long timeout)
 {
     char hexarray[13];
+    byte length;
     ble2_query_peripheral_devices(0,0);
     if(!waitForReply(2000,"AOK"))
     {
@@ -206,21 +213,21 @@ bool rn4020::doFindRemoteDevices(char** &macList, byte& nrOfItems, unsigned long
         {
             if(!nrOfItems)
             {
-                macList=(char**)malloc(sizeof(char*));
+                macList=(byte**)malloc(sizeof(char*));
                 if(!macList)
                 {
                     return false;
                 }
             }else
             {
-                macList=(char**)realloc(macList,sizeof(char*) * nrOfItems);
+                macList=(byte**)realloc(macList,sizeof(byte*) * nrOfItems);
                 if(!macList)
                 {
                     return false;
                 }
             }
-            macList[nrOfItems]=(char*)malloc(sizeof(char)*13);
-            strcpy(macList[nrOfItems],hexarray);
+            macList[nrOfItems]=(byte*)malloc(6);
+            hex2array(hexarray, macList[nrOfItems], length);
             nrOfItems++;
         }
         pch = strtok (NULL, "\r\n");
@@ -372,6 +379,7 @@ bool rn4020::getBluetoothDeviceName(char* btName)
     {
         if(sscanf(pch, "Name=%20s", btName)==1)
         {
+            resetBuffer();
             return true;
         }
         pch = strtok (NULL, "\r\n");
@@ -400,6 +408,7 @@ bool rn4020::getMacAddress(byte* array, byte& length)
             //MAC address contains 6 bytes
             length=6;
             hex2array(hexarray, array, length);
+            resetBuffer();
             return true;
         }
         pch = strtok (NULL, "\r\n");
@@ -441,6 +450,7 @@ bool rn4020::gotLine()
         if(indexRxBuf==BUFFSIZE-1)
         {
             //Reset buffer when there's an overflow
+            debug_println("Buffer overflow");
             resetBuffer();
         }
     }
@@ -473,6 +483,21 @@ void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
     for(byte i=0;i<lengthOut;i++)
     {
         sscanf(hexstringIn+(i<<1),"%2x", arrayOut+i);
+    }
+}
+
+void rn4020::array2hex(const byte* arrayIn, char* stringOut, byte length)
+{
+    if((!arrayIn) || (!stringOut))
+    {
+        return;
+    }
+    char temp[3];
+    strcpy(stringOut,"");
+    for(byte i=0;i<length;i++)
+    {
+        sprintf(temp,"%02X",arrayIn[i]);
+        strcat(stringOut, temp);
     }
 }
 
@@ -830,6 +855,16 @@ bool rn4020::waitForStartup(unsigned long baudrate)
     waitForReply(2000,"CMD");
     return !strncmp(rxbuf,"CMD",3);
 #else
+    if(waitForReply(2000,"CMD"))
+    {
+        return true;
+    }
+#ifdef DEBUG
+    digitalWrite(_pinWake_sw_7, LOW);
+    delay(500);
+    digitalWrite(_pinWake_sw_7, HIGH);
     return waitForReply(2000,"CMD");
+#endif
+    return false;
 #endif
 }

@@ -43,9 +43,9 @@ public:
     bool doAddCharacteristic(btCharacteristic* bt);
     bool doAddService(btCharacteristic* bt);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
-    bool doConnecting(const char* remoteBtAddress);
+    bool doConnecting(const byte *remoteBtAddress);
     bool doDisconnect();
-    bool doFindRemoteDevices(char **&macList, byte &nrOfItems, unsigned long timeout);
+    bool doFindRemoteDevices(byte **&macList, byte &nrOfItems, unsigned long timeout);
     bool doReboot(unsigned long baudrate);
     bool doStopConnecting();
     bool doRemoveBond();
@@ -79,6 +79,7 @@ private:
     bool doFactoryDefault();
     bool gotLine();
     void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
+    void array2hex(const byte* arrayIn, char* stringOut, byte length);
     bool isModuleActive(unsigned long uiTimeout);
     bool parseAdvertisement(char* buffer);
     word parseServicesList(btCharacteristic *bt);
@@ -96,6 +97,7 @@ private:
     void (*_ftAdvertisementReceived)(ADVERTISEMENT* adv);
     void (*_ftPasscodeGenerated)(unsigned long);
     void (*_ftCharacteristicWritten)(word handle, byte* newValue, byte length);
+    char* rxbuf;
 };
 
 #endif // RN4020_H

@@ -295,9 +295,9 @@ void ble2_bond(bond_saving_t parameter)
 
 void ble2_set_passcode(unsigned long passcode)
 {
-    const int n = snprintf(NULL, 0, "%lu", passcode);
+    const int n = snprintf(NULL, 0, "%lu\r\n", passcode);
     char buf[n+1];
-    snprintf(buf, n+1, "%lu", passcode);
+    snprintf(buf, n+1, "%lu\r\n", passcode);
     ble2_hal_send(buf);
 }
 

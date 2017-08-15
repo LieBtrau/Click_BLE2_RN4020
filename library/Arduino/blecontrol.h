@@ -36,7 +36,7 @@ public:
     bool getLocalMacAddress(byte* address, byte& length);
     void setEventListener(void(*ftEventReceived)(EVENT));
     void setPasscode(unsigned long pass);
-    bool findUnboundPeripheral(const char *remoteBtAddress);
+    bool findUnboundPeripheral(const byte *remoteBtAddress);
     unsigned long getPasscode();
     bool getBluetoothDeviceName(char* btName);
     bool setBluetoothDeviceName(const char* btName);
@@ -45,7 +45,7 @@ public:
     bool writeRemoteCharacteristic(btCharacteristic* bt, byte value);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
     bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);
-    bool secureConnect(const char* peripheralMac);
+    bool secureConnect(const byte *peripheralMac);
     void disconnect();
 private:
     typedef enum

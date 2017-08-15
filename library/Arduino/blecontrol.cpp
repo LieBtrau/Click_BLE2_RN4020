@@ -151,7 +151,7 @@ bool bleControl::loop()
     rn->loop();
 }
 
-bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
+bool bleControl::findUnboundPeripheral(const byte* remoteBtAddress)
 {
     bool bFound=false;
     bool bonded;
@@ -161,16 +161,16 @@ bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
     {
         rn->doRemoveBond();
     }
-    char** macList;
+    byte** macList;
     byte nrOfItems;
     //Start search
-    if(!rn->doFindRemoteDevices(macList, nrOfItems, 6000))
+    if(!rn->doFindRemoteDevices(macList, nrOfItems, 10000))
     {
         return false;
     }
     for(byte i=0;i<nrOfItems;i++)
     {
-        if(!strcmp(remoteBtAddress,macList[i]))
+        if(!memcmp(remoteBtAddress,macList[i],6))
         {
             bFound=true;
         }
@@ -181,7 +181,7 @@ bool bleControl::findUnboundPeripheral(const char* remoteBtAddress)
 }
 
 
-bool bleControl::secureConnect(const char* remoteBtAddress)
+bool bleControl::secureConnect(const byte* remoteBtAddress)
 {
     unsigned long ulStartTime;
     CONNECT_STATE state=ST_NOTCONNECTED;
