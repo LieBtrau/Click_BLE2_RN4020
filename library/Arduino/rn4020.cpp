@@ -148,7 +148,8 @@ bool rn4020::doConnecting(const byte* remoteBtAddress)
 bool rn4020::doDisconnect()
 {
     ble2_kill_active_connection();
-    return waitForReply(2000,"AOK");
+    //Sometimes got "AOK" ???
+    //Leads to "Connection End" when peripheral ends a bonded connection.
 }
 
 /* If the module is in an unknown state, e.g. unknown baudrate, then it can only be reset by toggling its
@@ -540,9 +541,12 @@ void rn4020::loop()
     {
         return;
     }
-    if(strstr(rxbuf, "Secured") && _ftBondingEvent)
+    if((strstr(rxbuf, "Secured") || strstr(rxbuf, "Bonded")) && _ftBondingEvent)
     {
-        _ftBondingEvent(BD_ESTABLISHED);
+        if(strstr(rxbuf, "Bonded"))
+        {
+            _ftBondingEvent(BD_ESTABLISHED);
+        }
         resetBuffer();
         return;
     }

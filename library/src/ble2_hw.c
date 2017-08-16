@@ -270,13 +270,16 @@ void ble2_start_advertisement(uint16_t interval, uint16_t window_time)
     char tmp[25] = {0};
     char tmp2[5] = {0};
 
-    strcpy (tmp,"A,");
-    sprintf(tmp2,"%04X",interval);
-    strcat(tmp,tmp2);
-    if(window_time>interval)
+    strcpy (tmp,"A");
+    if(interval)
     {
         sprintf(tmp2,",%04X",interval);
         strcat(tmp,tmp2);
+        if(window_time>interval)
+        {
+            sprintf(tmp2,",%04X",interval);
+            strcat(tmp,tmp2);
+        }
     }
     ble2_hal_send(tmp);
 }

@@ -18,7 +18,8 @@ public:
         EV_PASSCODE_WANTED,
         EV_PASSCODE_GENERATED,
         EV_CONNECTION_UP,
-        EV_CONNECTION_DOWN
+        EV_CONNECTION_DOWN,
+        EV_BONDING_ESTABLISHED
     }EVENT;
     typedef enum    //Starting from FW-version 1.33BEC, only these two services are supported.  Other ones must be created by the user.
     {
@@ -29,6 +30,7 @@ public:
     bleControl(rn4020 *prn);
     bool init();
     bool beginCentral();
+    bool startUndirectedAdvertizement(unsigned int interval_ms);
     bool programPeripheral();
     bool programCentral();
     bool beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);

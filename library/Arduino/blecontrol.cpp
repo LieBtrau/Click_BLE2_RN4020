@@ -114,6 +114,20 @@ bool bleControl::beginCentral()
     return rn->setOperatingMode(rn4020::OM_NORMAL);
 }
 
+bool bleControl::startUndirectedAdvertizement(unsigned int interval_ms)
+{
+    bool bonded;
+
+    //Unbound first, otherwise the bonded module can't be found by a scan
+    if(rn->isBonded(bonded) && bonded)
+    {
+        rn->doRemoveBond();
+    }
+    //stop advertizing
+    rn->doAdvertizing(false,0);
+    //start new advertizement command
+    return rn->doAdvertizing(true, interval_ms);
+}
 
 
 bool bleControl::addLocalCharacteristics(btCharacteristic **localCharacteristics, byte nrOfCharacteristics)
@@ -164,7 +178,7 @@ bool bleControl::findUnboundPeripheral(const byte* remoteBtAddress)
     byte** macList;
     byte nrOfItems;
     //Start search
-    if(!rn->doFindRemoteDevices(macList, nrOfItems, 10000))
+    if(!rn->doFindRemoteDevices(macList, nrOfItems, 1000))
     {
         return false;
     }
@@ -207,7 +221,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
             state=ST_CONNECTED;
             break;
         case ST_CONNECTED:
-            if(millis()>ulStartTime+10000)
+            if(millis()>ulStartTime+1000)
             {
                 disconnect();
                 return false;
@@ -360,6 +374,10 @@ void bondingEvent(rn4020::BONDING_MODES bd)
     {
     case rn4020::BD_ESTABLISHED:
         bIsBonded=true;
+        if(generateEvent)
+        {
+            generateEvent(bleControl::EV_BONDING_ESTABLISHED);
+        }
         break;
     case rn4020::BD_PASSCODE_NEEDED:
         if(generateEvent)
