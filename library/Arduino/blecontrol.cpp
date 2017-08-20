@@ -326,14 +326,19 @@ bool bleControl::writeLocalCharacteristic(btCharacteristic *bt, byte value)
     return rn->doWriteLocalCharacteristic(handle,&value,1);
 }
 
-bool bleControl::writeRemoteCharacteristic(btCharacteristic *bt, byte value)
+bool bleControl::writeRemoteCharacteristic(btCharacteristic *bt, byte *value, byte length)
 {
+    if( bt->getValueLength()<length ||
+            !(bt->getProperty() & (btCharacteristic::WRITE | btCharacteristic::WRITE_WOUT_RESP)) )
+    {
+        return false;
+    }
     word handle=getRemoteHandle(bt);
     if(!handle)
     {
         return false;
     }
-    return rn->doWriteRemoteCharacteristic(handle,&value,1);
+    return rn->doWriteRemoteCharacteristic(handle, value, length);
 }
 
 bool bleControl::readRemoteCharacteristic(btCharacteristic *bt, byte* value, byte& length)
@@ -417,10 +422,6 @@ void bondingEvent(rn4020::BONDING_MODES bd)
         break;
     case rn4020::BD_SECURED:
         status.isSecured=true;
-        if(generateEvent)
-        {
-            generateEvent(bleControl::EV_BONDING_SECURED);
-        }
         break;
     case rn4020::BD_PASSCODE_NEEDED:
         if(generateEvent)

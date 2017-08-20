@@ -48,7 +48,7 @@ public:
     bool setBluetoothDeviceName(const char* btName);
     bool addLocalCharacteristics(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
     bool writeLocalCharacteristic(btCharacteristic* bt, byte value);
-    bool writeRemoteCharacteristic(btCharacteristic* bt, byte value);
+    bool writeRemoteCharacteristic(btCharacteristic* bt, byte* value, byte length);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
     bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);
     bool secureConnect(const byte *peripheralMac);
