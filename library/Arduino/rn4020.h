@@ -36,14 +36,15 @@ public:
     typedef enum
     {
         BD_PASSCODE_NEEDED,
-        BD_ESTABLISHED
+        BD_BONDED,
+        BD_SECURED
     }BONDING_MODES;
     rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
     bool begin(unsigned long baudrate);
     bool doAddCharacteristic(btCharacteristic* bt);
     bool doAddService(btCharacteristic* bt);
     bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
-    bool doConnecting(const byte *remoteBtAddress);
+    bool startConnecting(const byte *remoteBtAddress);
     bool doDisconnect();
     bool doFindRemoteDevices(byte **&macList, byte &nrOfItems, unsigned long timeout);
     bool doReboot(unsigned long baudrate);

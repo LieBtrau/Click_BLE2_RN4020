@@ -19,7 +19,8 @@ public:
         EV_PASSCODE_GENERATED,
         EV_CONNECTION_UP,
         EV_CONNECTION_DOWN,
-        EV_BONDING_ESTABLISHED
+        EV_BONDING_BONDED,
+        EV_BONDING_SECURED
     }EVENT;
     typedef enum    //Starting from FW-version 1.33BEC, only these two services are supported.  Other ones must be created by the user.
     {
@@ -30,12 +31,15 @@ public:
     bleControl(rn4020 *prn);
     bool init();
     bool beginCentral();
-    bool startUndirectedAdvertizement(unsigned int interval_ms);
+    bool startAdvertizement(unsigned int interval_ms);
     bool programPeripheral();
     bool programCentral();
     bool beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
     bool loop(void);
     bool getLocalMacAddress(byte* address, byte& length);
+    bool isBonded();
+    bool isSecured();
+    bool unbond();
     void setEventListener(void(*ftEventReceived)(EVENT));
     void setPasscode(unsigned long pass);
     bool findUnboundPeripheral(const byte *remoteBtAddress);
@@ -53,10 +57,12 @@ private:
     typedef enum
     {
         ST_NOTCONNECTED,
+        ST_WAITING_FOR_CONNECTION,
         ST_CONNECTED,
+        ST_START_BONDING,
         ST_PASSCODE_GENERATED,
-        ST_PROV_BONDED,
-        ST_BONDED
+        ST_BONDED,
+        ST_SECURED
     }CONNECT_STATE;
     word getRemoteHandle(btCharacteristic *bt);
     word getLocalHandle(btCharacteristic *bt);

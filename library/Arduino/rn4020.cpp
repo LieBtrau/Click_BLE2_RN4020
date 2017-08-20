@@ -2,9 +2,12 @@
 #include "ble2_hw.h"
 #include "debug.h"
 
-static HardwareSerial* sPort;
+namespace
+{
+HardwareSerial* sPort;
 const byte BUFFSIZE=250;
-static byte indexRxBuf=0;
+ byte indexRxBuf=0; 
+}
 
 void UART_Wr_Ptr(char _data)
 {
@@ -130,7 +133,7 @@ bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
     return waitForReply(2000,"AOK");
 }
 
-bool rn4020::doConnecting(const byte* remoteBtAddress)
+bool rn4020::startConnecting(const byte* remoteBtAddress)
 {
     char strAddress[13];
     array2hex(remoteBtAddress, strAddress, 6);
@@ -142,7 +145,7 @@ bool rn4020::doConnecting(const byte* remoteBtAddress)
     {
         return false;
     }
-    return waitForReply(10000,"Connected");
+    return true;
 }
 
 bool rn4020::doDisconnect()
@@ -541,18 +544,21 @@ void rn4020::loop()
     {
         return;
     }
-    if((strstr(rxbuf, "Secured") || strstr(rxbuf, "Bonded")) && _ftBondingEvent)
-    {
-        if(strstr(rxbuf, "Bonded"))
-        {
-            _ftBondingEvent(BD_ESTABLISHED);
-        }
-        resetBuffer();
-        return;
-    }
     if(strstr(rxbuf, "Connected") && _ftConnectionStateChanged)
     {
         _ftConnectionStateChanged(true);
+        resetBuffer();
+        return;
+    }
+    if(strstr(rxbuf, "Bonded") && _ftBondingEvent)
+    {
+        _ftBondingEvent(BD_BONDED);
+        resetBuffer();
+        return;
+    }
+    if(strstr(rxbuf, "Secured") && _ftBondingEvent)
+    {
+        _ftBondingEvent(BD_SECURED);
         resetBuffer();
         return;
     }
@@ -808,7 +814,6 @@ bool rn4020::startBonding()
     ble2_bond(SAVED);
     return waitForReply(2000,"AOK");
 }
-
 
 word rn4020::waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols)
 {

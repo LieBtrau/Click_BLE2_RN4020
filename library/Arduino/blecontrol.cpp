@@ -12,8 +12,12 @@ namespace
 {
 unsigned long pass;
 volatile bool bPassReady=false;
-volatile bool bIsBonded;
-bool bIsCentral;
+struct
+{
+    bool isConnected=false;
+    bool isBonded=false;       //reflects RN4020 output of "Q,1"-command
+    bool isSecured=false;
+} status;
 void (*generateEvent)(bleControl::EVENT);
 
 volatile char* foundBtAddress=0;
@@ -24,7 +28,6 @@ rn4020 *rn;
 
 bleControl::bleControl(rn4020* prn)
 {
-    bIsBonded=false;
     generateEvent=0;
     rn=prn;
 }
@@ -35,13 +38,24 @@ bool bleControl::init()
     //Switch to 2400baud
     // + It's more reliable than 115200baud with the ProTrinket 3V.
     // + It also works when the module is in deep sleep mode.
-    if(!rn->begin(2400))
+    if(!rn->begin(2400) || !rn->isBonded(status.isBonded))
     {
         return false;
     }
+
     rn->setConnectionListener(connectionEvent);
     rn->setBondingListener(bondingEvent);
     return true;
+}
+
+bool bleControl::isBonded()
+{
+    return status.isBonded;
+}
+
+bool bleControl::isSecured()
+{
+    return status.isSecured;
 }
 
 bool bleControl::programPeripheral()
@@ -82,7 +96,6 @@ bool bleControl::programCentral()
 
 bool bleControl::beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics)
 {
-    bIsCentral=false;
     //Reboot is needed to activate previously programmed settings.
     if(!rn->doReboot(2400))
     {
@@ -103,7 +116,6 @@ bool bleControl::beginPeripheral(btCharacteristic **localCharacteristics, byte n
 
 bool bleControl::beginCentral()
 {
-    bIsCentral=true;
     //Reboot is needed to activate previously programmed settings.
     if(!rn->doReboot(2400))
     {
@@ -114,15 +126,22 @@ bool bleControl::beginCentral()
     return rn->setOperatingMode(rn4020::OM_NORMAL);
 }
 
-bool bleControl::startUndirectedAdvertizement(unsigned int interval_ms)
+bool bleControl::unbond()
 {
-    bool bonded;
-
-    //Unbound first, otherwise the bonded module can't be found by a scan
-    if(rn->isBonded(bonded) && bonded)
+    if(!status.isBonded)
     {
-        rn->doRemoveBond();
+        return true;
     }
+    if(rn->doRemoveBond())
+    {
+        status.isBonded=false;
+        return true;
+    }
+    return false;
+}
+
+bool bleControl::startAdvertizement(unsigned int interval_ms)
+{
     //stop advertizing
     rn->doAdvertizing(false,0);
     //start new advertizement command
@@ -168,12 +187,11 @@ bool bleControl::loop()
 bool bleControl::findUnboundPeripheral(const byte* remoteBtAddress)
 {
     bool bFound=false;
-    bool bonded;
 
     //Unbound first, otherwise the bonded module can't be found by a scan
-    if(rn->isBonded(bonded) && bonded)
+    if(!unbond())
     {
-        rn->doRemoveBond();
+        return false;
     }
     byte** macList;
     byte nrOfItems;
@@ -201,16 +219,31 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
     CONNECT_STATE state=ST_NOTCONNECTED;
     do
     {
+        loop();
         switch(state)
         {
         case ST_NOTCONNECTED:
-            if(!rn->doConnecting(remoteBtAddress))
+            if(!rn->startConnecting(remoteBtAddress))
+            {
+                return false;
+            }
+            ulStartTime=millis();
+            state=ST_WAITING_FOR_CONNECTION;
+            break;
+        case ST_WAITING_FOR_CONNECTION:
+            if(millis()>ulStartTime+10000)
             {
                 //stop connecting process
                 rn->doStopConnecting();
                 return false;
             }
-            delay(1000);
+            if(status.isConnected)
+            {
+                state=ST_CONNECTED;
+            }
+            break;
+        case ST_CONNECTED:
+            //delay(1000);
             bPassReady=false;
             if(!rn->startBonding())
             {
@@ -218,44 +251,47 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
                 return false;
             }
             ulStartTime=millis();
-            state=ST_CONNECTED;
+            state=ST_START_BONDING;
             break;
-        case ST_CONNECTED:
+        case ST_START_BONDING:
+            if(millis()>ulStartTime+1000)
+            {
+                disconnect();
+                return false;
+            }
+            if(bPassReady)  //establishing bond for the 1st time
+            {
+                generateEvent(EV_PASSCODE_GENERATED);
+                state=ST_PASSCODE_GENERATED;
+                ulStartTime=millis();
+            }
+            if(status.isBonded && status.isSecured) //re-establishing bond
+            {
+                state=ST_BONDED;
+            }
+            break;
+        case ST_PASSCODE_GENERATED:
             if(millis()>ulStartTime+1000)
             {
                 disconnect();
                 return false;
             }
             loop();
-            if(bPassReady)
+            if(status.isBonded)
             {
-                bIsBonded=false;
-                generateEvent(EV_PASSCODE_GENERATED);
-                state=ST_PASSCODE_GENERATED;
-                ulStartTime=millis();
+                state=ST_BONDED;
             }
             break;
-        case ST_PASSCODE_GENERATED:
-            if(millis()>ulStartTime+10000)
-            {
-                disconnect();
-                return false;
-            }
-            loop();
-            if(bIsBonded)
-            {
-                state=ST_PROV_BONDED;
-            }
-            break;
-        case ST_PROV_BONDED:
+        case ST_BONDED:
             if(!rn->startBonding())
             {
                 rn->doDisconnect();
                 return false;
             }
-            state=ST_BONDED;
+            state=ST_SECURED;
+            break;
         }
-    }while(state!=ST_BONDED);
+    }while(state!=ST_SECURED);
 
 }
 
@@ -372,11 +408,18 @@ void bondingEvent(rn4020::BONDING_MODES bd)
 {
     switch(bd)
     {
-    case rn4020::BD_ESTABLISHED:
-        bIsBonded=true;
+    case rn4020::BD_BONDED:
+        status.isBonded=true;
         if(generateEvent)
         {
-            generateEvent(bleControl::EV_BONDING_ESTABLISHED);
+            generateEvent(bleControl::EV_BONDING_BONDED);
+        }
+        break;
+    case rn4020::BD_SECURED:
+        status.isSecured=true;
+        if(generateEvent)
+        {
+            generateEvent(bleControl::EV_BONDING_SECURED);
         }
         break;
     case rn4020::BD_PASSCODE_NEEDED:
@@ -392,27 +435,13 @@ void bondingEvent(rn4020::BONDING_MODES bd)
 
 void connectionEvent(bool bConnectionUp)
 {
-    if(bConnectionUp)
+    status.isConnected=bConnectionUp;
+    status.isSecured=false;
+    if(!generateEvent)
     {
-        if(generateEvent)
-        {
-            generateEvent(bleControl::EV_CONNECTION_UP);
-        }
-    }else
-    {
-        if(generateEvent)
-        {
-            generateEvent(bleControl::EV_CONNECTION_DOWN);
-        }
-        if(!bIsCentral)
-        {
-            //After connection goes down, advertizing must be restarted or the module will no longer be connectable.
-            if(!rn->doAdvertizing(true,5000))
-            {
-                return;
-            }
-        }
+        return;
     }
+    generateEvent(bConnectionUp ? bleControl::EV_CONNECTION_UP : bleControl::EV_CONNECTION_DOWN);
 }
 
 void characteristicWrittenEvent(word handle, byte* value, byte length)

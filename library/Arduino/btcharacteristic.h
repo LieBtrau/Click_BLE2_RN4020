@@ -1,6 +1,7 @@
 #ifndef BTCHARACTERISTIC_H
 #define BTCHARACTERISTIC_H
 #include "Arduino.h"
+#include "debug.h"
 
 class btCharacteristic
 {
