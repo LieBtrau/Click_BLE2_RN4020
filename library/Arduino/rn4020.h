@@ -53,14 +53,16 @@ public:
     bool doRemovePrivateCharacteristics();
     bool doReadLocalCharacteristic(word handle, byte* array, byte& length);
     bool doReadRemoteCharacteristic(word handle, byte* array, byte& length);
-    void doUpdateHandles(btCharacteristic** characteristicList, byte count);
+    void doUpdateHandles(btCharacteristic* characteristicList[], byte nrOfChrs);
     bool doWriteLocalCharacteristic(word handle, const byte *array, byte length);
     bool doWriteRemoteCharacteristic(word handle, const byte *array, byte length);
     bool getBluetoothDeviceName(char* btName);
     word getLocalHandle(btCharacteristic* bt);
     bool getMacAddress(byte* array, byte& length);
     word getRemoteHandle(btCharacteristic *bt);
+    bool isBonded(bool &status, byte *macOut);
     bool isBonded(bool &status);
+    bool isConnectedTo(byte* macOut);
     void loop();
     void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
     bool setBluetoothDeviceName(const char* btName);
@@ -98,7 +100,6 @@ private:
     void (*_ftAdvertisementReceived)(ADVERTISEMENT* adv);
     void (*_ftPasscodeGenerated)(unsigned long);
     void (*_ftCharacteristicWritten)(word handle, byte* newValue, byte length);
-    char* rxbuf;
 };
 
 #endif // RN4020_H

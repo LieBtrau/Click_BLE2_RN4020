@@ -5,8 +5,8 @@
 namespace
 {
 HardwareSerial* sPort;
-const byte BUFFSIZE=250;
- byte indexRxBuf=0; 
+char rxbuf[250];
+byte indexRxBuf=0;
 }
 
 void UART_Wr_Ptr(char _data)
@@ -39,7 +39,6 @@ rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWak
     _ftCharacteristicWritten(0),
     _ftPasscodeGenerated(0)
 {
-    rxbuf=(char*)malloc(BUFFSIZE);
     sPort=&s;
     ble2_hal_init();
 }
@@ -78,13 +77,13 @@ bool rn4020::begin(unsigned long baudrate)
             return false;
         }
         debug_println("Factory default ok.");
-        if(!setBaudrate(2400))
+        if(baudrate==115200)
         {
-            return false;
+            return true;
         }
-        //Baudrate only becomes active after resetting the module.
-        if(!doReboot(2400))
+        if(!setBaudrate(baudrate) || !doReboot(baudrate))
         {
+            //Baudrate only becomes active after resetting the module.
             return false;
         }
     }
@@ -241,7 +240,6 @@ bool rn4020::doFindRemoteDevices(byte** &macList, byte& nrOfItems, unsigned long
 
 bool rn4020::doReadLocalCharacteristic(word handle, byte* array, byte& length)
 {
-    char hexarray[41];//maximum data length=20 bytes
     ble2_read_server_characteristic_content(handle);
     if(!waitForNrOfLines(2000,1))
     {
@@ -294,7 +292,7 @@ bool rn4020::doStopConnecting()
 /* When adding services and characteristics to the RN4020, the handles of the existing services and characteristics
  * change.  This function updates those handles.
  */
-void rn4020::doUpdateHandles(btCharacteristic** characteristicList, byte count)
+void rn4020::doUpdateHandles(btCharacteristic* characteristicList[], byte nrOfChrs)
 {
     byte ctr=0;
 
@@ -304,7 +302,7 @@ void rn4020::doUpdateHandles(btCharacteristic** characteristicList, byte count)
     {
         return;
     }
-    for(ctr=0;ctr<count;ctr++)
+    for(ctr=0;ctr<nrOfChrs;ctr++)
     {
         characteristicList[ctr]->setHandle(parseServicesList(characteristicList[ctr]));
     }
@@ -346,10 +344,17 @@ bool rn4020::doWriteRemoteCharacteristic(word handle, const byte* array, byte le
 
 bool rn4020::isBonded(bool &status)
 {
+    byte mac[6];
+    return isBonded(status, mac);
+}
+
+bool rn4020::isBonded(bool &status, byte* macOut)
+{
     ble2_get_bonded_status();
     char str[]="No Bonding";
-    char mac[13];
-    if(!waitForNrOfLines(2000,1))
+    char hexmac[13];
+    byte length;
+    if(!waitForNrOfLines(2000,1) || !macOut)
     {
         return false;
     }
@@ -358,13 +363,32 @@ bool rn4020::isBonded(bool &status)
         status=false;
         return true;
     }
-    if(sscanf(rxbuf,"%12s,0",mac))
+    if(sscanf(rxbuf,"%12s,0", hexmac))
     {
         status=true;
-        return true;
+        hex2array(hexmac, macOut, length);
+        if(length==6)return true;
     }
     return false;
 }
+
+bool rn4020::isConnectedTo(byte* macOut)
+{
+    char hexmac[13];
+    byte length;
+    ble2_get_connection_status();
+    if(!waitForNrOfLines(2000,1) || !macOut)
+    {
+        return false;
+    }
+    if(sscanf(rxbuf,"%12s,0", hexmac))
+    {
+        hex2array(hexmac, macOut, length);
+        if(length==6)return true;
+    }
+    return false;
+}
+
 
 bool rn4020::getBluetoothDeviceName(char* btName)
 {
@@ -451,7 +475,7 @@ bool rn4020::gotLine()
     {
         rxbuf[indexRxBuf]=c;
         rxbuf[++indexRxBuf]='\0';
-        if(indexRxBuf==BUFFSIZE-1)
+        if(indexRxBuf==sizeof(rxbuf)-1)
         {
             //Reset buffer when there's an overflow
             debug_println("Buffer overflow");
@@ -459,19 +483,22 @@ bool rn4020::gotLine()
         }
     }
     static char b=0,d=0;
-    if(b==0 && d==0)
-    {
-        debug_print("\r\nRX: ");
-    }
-    if(c>27)
-    {
-        debug_print(c);
-    }
+
+    //Only print characters when not using 115200baud in the RN4020.
+
+//    if(b==0 && d==0)
+//    {
+//        debug_print("\r\nRX: ");
+//    }
+//    if(c>27)
+//    {
+//        debug_print(c);
+//    }
     b=d;
     d=c;
     if(b=='\r' && d=='\n')
     {
-        debug_print("\r\nRX: ");
+//        debug_print("\r\nRX: ");
         return true;
     }
     return false;
@@ -484,10 +511,12 @@ void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
         return;
     }
     lengthOut=strlen(hexstringIn)>>1;
+    byte tempBuf[lengthOut+3];  //sscanf writes 4 bytes per run, so temp buffer must be at least 3 bytes bigger than final buffer.
     for(byte i=0;i<lengthOut;i++)
     {
-        sscanf(hexstringIn+(i<<1),"%2x", arrayOut+i);
+        sscanf(hexstringIn+(i<<1),"%2x", tempBuf+i);
     }
+    memcpy(arrayOut, tempBuf, lengthOut);
 }
 
 void rn4020::array2hex(const byte* arrayIn, char* stringOut, byte length)
@@ -659,6 +688,7 @@ word rn4020::parseServicesList(btCharacteristic* bt)
         pch = strtok (NULL, "\r\n");
     }while (pch != NULL);
     free(tempBuf);
+    return 0;
 }
 
 bool rn4020::doRemovePrivateCharacteristics()
@@ -868,7 +898,7 @@ bool rn4020::waitForStartup(unsigned long baudrate)
     {
         return true;
     }
-#ifdef DEBUG
+#ifdef ARDUINO_STM_NUCLEO_F103RB//for use on breakout board
     digitalWrite(_pinWake_sw_7, LOW);
     delay(500);
     digitalWrite(_pinWake_sw_7, HIGH);

@@ -35,7 +35,7 @@ public:
     byte getSecurityBmp();
     void callListener(byte *data, byte &length);
 private:
-    char* cleanupUuid(const char* uuid);
+    void cleanupUuid(const char* uuid, char *&out);
     char* _uuid_service;
     char* _uuid_characteristic;
     byte _propertyBmp;

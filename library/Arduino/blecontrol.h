@@ -29,15 +29,16 @@ public:
         SRV_USR_PRIV_SERV=0x00000001
     }SERVICES;
     bleControl(rn4020 *prn);
-    bool init();
+    bool init(unsigned long baud);
     bool beginCentral();
     bool startAdvertizement(unsigned int interval_ms);
     bool programPeripheral();
     bool programCentral();
-    bool beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
+    bool beginPeripheral(btCharacteristic *localCharacteristics[], byte nrOfChrs);
     bool loop(void);
     bool getLocalMacAddress(byte* address, byte& length);
     bool isBonded();
+    bool isBondedTo(byte* mac);
     bool isSecured();
     bool unbond();
     void setEventListener(void(*ftEventReceived)(EVENT));
@@ -46,13 +47,16 @@ public:
     unsigned long getPasscode();
     bool getBluetoothDeviceName(char* btName);
     bool setBluetoothDeviceName(const char* btName);
-    bool addLocalCharacteristics(btCharacteristic **localCharacteristics, byte nrOfCharacteristics);
+    bool addLocalCharacteristics(btCharacteristic *localCharacteristics[], byte nrOfChrs);
     bool writeLocalCharacteristic(btCharacteristic* bt, byte value);
     bool writeRemoteCharacteristic(btCharacteristic* bt, byte* value, byte length);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
     bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);
     bool secureConnect(const byte *peripheralMac);
     void disconnect();
+    bool sleep();
+    bool reboot();
+    word getLocalHandle(btCharacteristic *bt);
 private:
     typedef enum
     {
@@ -65,7 +69,7 @@ private:
         ST_SECURED
     }CONNECT_STATE;
     word getRemoteHandle(btCharacteristic *bt);
-    word getLocalHandle(btCharacteristic *bt);
+    unsigned long baudrate;
 };
 
 #endif // BLECONTROL_H

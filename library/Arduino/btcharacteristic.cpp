@@ -16,12 +16,10 @@ btCharacteristic::btCharacteristic(const char* uuid_service,
                                    void (*ftListener)(byte*, byte&)):
     _propertyBmp(propertyBmp),
     _valueLength(valueLength),
-    _securityBmp(securityBmp),
-    _ftListener(0),
-    _handle(0)
+    _securityBmp(securityBmp)
 {
-    _uuid_service = cleanupUuid(uuid_service);
-    _uuid_characteristic=cleanupUuid(uuid_characteristic);
+    cleanupUuid(uuid_service, _uuid_service);
+    cleanupUuid(uuid_characteristic, _uuid_characteristic);
     _ftListener=ftListener;
 }
 
@@ -71,13 +69,13 @@ void btCharacteristic::callListener(byte *data, byte& length)
     _ftListener(data, length);
 }
 
-char* btCharacteristic::cleanupUuid(const char* uuid)
+void btCharacteristic::cleanupUuid(const char* uuid, char* &out)
 {
     char* pch;
     char temp[37];
     if(strlen(uuid)<1 || strlen(uuid)>36)
     {
-        return 0;
+        return;
     }
     //Remove the '-' from the UUIDs
     strcpy(temp, uuid);
@@ -95,11 +93,6 @@ char* btCharacteristic::cleanupUuid(const char* uuid)
         *pch=toupper(*pch);
         pch++;
     }while(*pch);
-    char* uuidOut=(char*)malloc(strlen(temp)+1);
-    if(!uuidOut)
-    {
-        return 0;
-    }
-    strcpy(uuidOut, temp);
-    return uuidOut;
+    out=(char*)malloc(strlen(temp)+1);
+    strcpy(out, temp);
 }

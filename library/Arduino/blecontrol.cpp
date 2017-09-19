@@ -20,10 +20,11 @@ struct
 } status;
 void (*generateEvent)(bleControl::EVENT);
 
-volatile char* foundBtAddress=0;
-btCharacteristic** _localCharacteristics=0;
-byte _nrOfCharacteristics=0;
+volatile char* foundBtAddress;
+btCharacteristic** _localCharacteristics;
+byte _nrOfCharacteristics;
 rn4020 *rn;
+const int CONNECTION_TIMEOUT=15000;
 }
 
 bleControl::bleControl(rn4020* prn)
@@ -33,19 +34,25 @@ bleControl::bleControl(rn4020* prn)
 }
 
 //Set up the RN4020 module
-bool bleControl::init()
+//2400baud:
+// + It's more reliable than 115200baud with the ProTrinket 3V.
+// + It also works when the module is in deep sleep mode.
+bool bleControl::init(unsigned long baud)
 {
-    //Switch to 2400baud
-    // + It's more reliable than 115200baud with the ProTrinket 3V.
-    // + It also works when the module is in deep sleep mode.
-    if(!rn->begin(2400) || !rn->isBonded(status.isBonded))
+    baudrate=baud;
+    if(!rn->begin(baudrate) || !rn->isBonded(status.isBonded))
     {
         return false;
     }
-
     rn->setConnectionListener(connectionEvent);
     rn->setBondingListener(bondingEvent);
     return true;
+}
+
+bool bleControl::isBondedTo(byte* mac)
+{
+    bool isBonded;
+    return !rn->isBonded(isBonded, mac) || !isBonded ? false : true;
 }
 
 bool bleControl::isBonded()
@@ -87,6 +94,7 @@ bool bleControl::programCentral()
     }
     //Central role
     //Enable authentication with Keyboard and display as IO-capabilities
+    //Actually this can be left to 0x0000 0000, authentication will work the same way.
     if(!rn->setFeatures(FR_CENTRAL | FR_AUTH_KEYB_DISP))
     {
         return false;
@@ -94,30 +102,18 @@ bool bleControl::programCentral()
     return true;
 }
 
-bool bleControl::beginPeripheral(btCharacteristic **localCharacteristics, byte nrOfCharacteristics)
+bool bleControl::beginPeripheral(btCharacteristic *localCharacteristics[], byte nrOfChrs)
 {
-    //Reboot is needed to activate previously programmed settings.
-    if(!rn->doReboot(2400))
-    {
-        return false;
-    }
     _localCharacteristics=localCharacteristics;
-    _nrOfCharacteristics=nrOfCharacteristics;
-    rn->doUpdateHandles(_localCharacteristics, _nrOfCharacteristics);
+    _nrOfCharacteristics=nrOfChrs;
     rn->setCharacteristicWrittenListener(characteristicWrittenEvent);
-    //Start advertizing to make the RN4020 discoverable & connectable
-    //Auto-advertizing is not used, because it doesn't allow for setting the advertisement interval
-    if(!rn->doAdvertizing(true,5000))
-    {
-        return false;
-    }
-    return rn->setOperatingMode(rn4020::OM_DEEP_SLEEP);
+    return true;
 }
 
 bool bleControl::beginCentral()
 {
     //Reboot is needed to activate previously programmed settings.
-    if(!rn->doReboot(2400))
+    if(!rn->doReboot(baudrate))
     {
         return false;
     }
@@ -149,28 +145,29 @@ bool bleControl::startAdvertizement(unsigned int interval_ms)
 }
 
 
-bool bleControl::addLocalCharacteristics(btCharacteristic **localCharacteristics, byte nrOfCharacteristics)
+bool bleControl::addLocalCharacteristics(btCharacteristic *localCharacteristics[], byte nrOfChrs)
 {
     _localCharacteristics=localCharacteristics;
-    _nrOfCharacteristics=nrOfCharacteristics;
+    _nrOfCharacteristics=nrOfChrs;
 
     if(!rn->doRemovePrivateCharacteristics())
     {
         return false;
     }
     //Power must be cycled after removing private characteristics
-    if(!rn->begin(2400))
+    if(!rn->begin(baudrate))
     {
         return false;
     }
-    for(byte i=0;i<_nrOfCharacteristics;i++)
+    for(byte i=0;i<nrOfChrs;i++)
     {
         if((!rn->doAddService(_localCharacteristics[i])) || (!rn->doAddCharacteristic(_localCharacteristics[i])))
         {
             return false;
         }
     }
-    //doUpdateHandles must be called after this function.
+    rn->doUpdateHandles(_localCharacteristics, nrOfChrs);
+    return true;
 }
 
 
@@ -216,7 +213,24 @@ bool bleControl::findUnboundPeripheral(const byte* remoteBtAddress)
 bool bleControl::secureConnect(const byte* remoteBtAddress)
 {
     unsigned long ulStartTime;
-    CONNECT_STATE state=ST_NOTCONNECTED;
+    byte mac[6];
+    CONNECT_STATE state;
+
+    if(rn->isConnectedTo(mac))
+    {
+        if(memcmp(mac,remoteBtAddress, sizeof(mac)))
+        {
+            rn->doDisconnect();
+            state=ST_NOTCONNECTED;
+        }
+        else
+        {
+            state=ST_CONNECTED;
+        }
+    }else
+    {
+        state=ST_NOTCONNECTED;
+    }
     do
     {
         loop();
@@ -231,7 +245,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
             state=ST_WAITING_FOR_CONNECTION;
             break;
         case ST_WAITING_FOR_CONNECTION:
-            if(millis()>ulStartTime+10000)
+            if(millis()>ulStartTime+CONNECTION_TIMEOUT)
             {
                 //stop connecting process
                 rn->doStopConnecting();
@@ -259,15 +273,24 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
                 disconnect();
                 return false;
             }
-            if(bPassReady)  //establishing bond for the 1st time
-            {
-                generateEvent(EV_PASSCODE_GENERATED);
-                state=ST_PASSCODE_GENERATED;
-                ulStartTime=millis();
-            }
             if(status.isBonded && status.isSecured) //re-establishing bond
             {
                 state=ST_BONDED;
+            }
+            if(bPassReady)  //establishing bond for the 1st time
+            {
+                if(status.isBonded)
+                {
+                    //Generating passcode while bonded already?  Central must have lost power.
+                    //Repairing needed.
+                    debug_println("Repairing needed.");
+                    //The disconnect will only be executed after the 30s timeout of the password input.
+                    disconnect();
+                    return false;
+                }
+                generateEvent(EV_PASSCODE_GENERATED);
+                state=ST_PASSCODE_GENERATED;
+                ulStartTime=millis();
             }
             break;
         case ST_PASSCODE_GENERATED:
@@ -276,7 +299,6 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
                 disconnect();
                 return false;
             }
-            loop();
             if(status.isBonded)
             {
                 state=ST_BONDED;
@@ -397,6 +419,15 @@ void bleControl::setEventListener(void(*ftEventReceived)(EVENT))
     generateEvent=ftEventReceived;
 }
 
+bool bleControl::sleep()
+{
+    return rn->setOperatingMode(rn4020::OM_DEEP_SLEEP);
+}
+
+bool bleControl::reboot()
+{
+    return rn->doReboot(baudrate);
+}
 
 void advertisementEvent(rn4020::ADVERTISEMENT* adv)
 {
@@ -414,6 +445,7 @@ void bondingEvent(rn4020::BONDING_MODES bd)
     switch(bd)
     {
     case rn4020::BD_BONDED:
+        debug_println("Bonded event");
         status.isBonded=true;
         if(generateEvent)
         {
@@ -421,6 +453,7 @@ void bondingEvent(rn4020::BONDING_MODES bd)
         }
         break;
     case rn4020::BD_SECURED:
+        debug_println("Secured event");
         status.isSecured=true;
         break;
     case rn4020::BD_PASSCODE_NEEDED:
@@ -461,4 +494,5 @@ void passcodeGeneratedEvent(unsigned long passcode)
 {
     pass=passcode;
     bPassReady=true;
+    debug_println("pass generated");
 }
