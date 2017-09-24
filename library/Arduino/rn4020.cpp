@@ -2,6 +2,8 @@
 #include "ble2_hw.h"
 #include "debug.h"
 
+//#define DEBUG_RX
+
 namespace
 {
 HardwareSerial* sPort;
@@ -58,6 +60,7 @@ bool rn4020::doAddService(btCharacteristic* bt)
 
 bool rn4020::begin(unsigned long baudrate)
 {
+    digitalWrite(_pinEnPwr, HIGH);      //enable power
     pinMode(_pinEnPwr, OUTPUT);
     pinMode(_pinWake_hw_15, OUTPUT);
     pinMode(_pinWake_sw_7, OUTPUT);
@@ -66,28 +69,13 @@ bool rn4020::begin(unsigned long baudrate)
     {
         return false;
     }
-    //Establish UART communication with module
-    cyclePower(OM_NORMAL);
-    if(!waitForStartup(baudrate))
+    setLocalBaud(baudrate);
+    if(!setOperatingMode(OM_NORMAL))
     {
-        //Maybe the module is blocked or set to an unknown baudrate?
-        if(!doFactoryDefault())
-        {
-            debug_println("Factory default failed.");
-            return false;
-        }
-        debug_println("Factory default ok.");
-        if(baudrate==115200)
-        {
-            return true;
-        }
-        if(!setBaudrate(baudrate) || !doReboot(baudrate))
-        {
-            //Baudrate only becomes active after resetting the module.
-            return false;
-        }
+        return false;
     }
-    return true;
+    //"CMD" will be printed, catch it.
+    return waitForStartup();
 }
 
 word rn4020::getNrOfOccurrence(char* buf, char findc)
@@ -159,9 +147,10 @@ bool rn4020::doDisconnect()
  * of the RN4020 with a GPIO of your MCU.
  * At power up, the SW_WAKE pin is held high to force full factory reset when toggling the HW_WAKE lines.
  */
-bool rn4020::doFactoryDefault()
+bool rn4020::doFactoryDefault(unsigned long baudrate)
 {
-    setOperatingMode(OM_NORMAL);
+    setLocalBaud(115200);
+    cyclePower(OM_NORMAL);
     delay(200);
     debug_println("Forcing factory default.");
     for(byte i=0;i<8;i++)
@@ -177,8 +166,17 @@ bool rn4020::doFactoryDefault()
     //Force reboot.  It allows us to check if the module communication is OK again.
     cyclePower(OM_NORMAL);
     //Factory default baud=115200
-    return waitForStartup(115200);
-}
+    if(!waitForStartup())
+    {
+        return false;
+    }
+    debug_println("Factory default ok.");
+    if((baudrate==115200) || (setBaudrate(baudrate) && doReboot(baudrate)))
+    {
+        return true;
+    }
+    return false;
+ }
 
 /* Scan for undirected advertisements.
  * Bonded (but unconnected) devices will send directed advertisements (unless configured otherwise with "SR")
@@ -245,6 +243,7 @@ bool rn4020::doReadLocalCharacteristic(word handle, byte* array, byte& length)
     {
         return false;
     }
+
     hex2array(rxbuf, array, length);
     resetBuffer();
     return true;
@@ -270,9 +269,10 @@ bool rn4020::doReadRemoteCharacteristic(word handle, byte* array, byte& length)
 bool rn4020::doReboot(unsigned long baudrate)
 {
     ble2_device_reboot();
+    setLocalBaud(baudrate);
     //ProTrinket 3V gets framing errors when trying to receive the "Reboot" at 115200baud.
     //waitForReply(2000,"Reboot");
-    return waitForStartup(baudrate);
+    return waitForStartup();
 }
 
 bool rn4020::doRemoveBond()
@@ -484,21 +484,22 @@ bool rn4020::gotLine()
     }
     static char b=0,d=0;
 
+#ifdef DEBUG_RX
     //Only print characters when not using 115200baud in the RN4020.
-
-//    if(b==0 && d==0)
-//    {
-//        debug_print("\r\nRX: ");
-//    }
-//    if(c>27)
-//    {
-//        debug_print(c);
-//    }
+    if(b==0 && d==0)
+    {
+        debug_print("\r\nRX: ");
+    }
+    if(c>27)
+    {
+        debug_print(c);
+    }
+#endif
     b=d;
     d=c;
     if(b=='\r' && d=='\n')
     {
-//        debug_print("\r\nRX: ");
+        //        debug_print("\r\nRX: ");
         return true;
     }
     return false;
@@ -510,11 +511,11 @@ void rn4020::hex2array(char* hexstringIn, byte* arrayOut, byte& lengthOut)
     {
         return;
     }
-    lengthOut=strlen(hexstringIn)>>1;
-    byte tempBuf[lengthOut+3];  //sscanf writes 4 bytes per run, so temp buffer must be at least 3 bytes bigger than final buffer.
-    for(byte i=0;i<lengthOut;i++)
+    byte tempBuf[(strlen(hexstringIn)>>1)+3];  //sscanf writes 4 bytes per run, so temp buffer must be at least 3 bytes bigger than final buffer.
+    lengthOut=0;
+    while(sscanf(hexstringIn+(lengthOut<<1),"%2x", tempBuf+lengthOut)==1)
     {
-        sscanf(hexstringIn+(i<<1),"%2x", tempBuf+i);
+        lengthOut++;
     }
     memcpy(arrayOut, tempBuf, lengthOut);
 }
@@ -534,6 +535,7 @@ void rn4020::array2hex(const byte* arrayIn, char* stringOut, byte length)
     }
 }
 
+//pin12 high = active, low = sleep
 bool rn4020::isModuleActive(unsigned long uiTimeout)
 {
     unsigned long ulStartTime=millis();
@@ -786,6 +788,13 @@ bool rn4020::setFeatures(uint32_t features)
     return waitForReply(2000,"AOK");
 }
 
+void rn4020::setLocalBaud(unsigned long baudrate)
+{
+    delay(100);//give serial port time to send its last characters
+    sPort->flush();//on Nucleo, flush() simply clears buffers, it doesn't wait for TX-ing to finish.
+    sPort->end();
+    sPort->begin(baudrate);
+}
 
 //http://microchip.wikidot.com/ble:rn4020-power-states
 bool rn4020::setOperatingMode(OPERATING_MODES om)
@@ -800,16 +809,17 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         digitalWrite(_pinWake_hw_15, LOW);
         return bSuccess;
     case OM_DEEP_SLEEP:
-        bInNormalMode=isModuleActive(2000);
+//        bInNormalMode=isModuleActive(2000);
         digitalWrite(_pinWake_sw_7, LOW);
-        if(bInNormalMode)
-        {
-            bSuccess=waitForReply(1000,"END");
-        }
+//        if(bInNormalMode)
+//        {
+//            bSuccess=waitForReply(1000,"END");
+//        }
         digitalWrite(_pinWake_hw_15, HIGH);
         delay(10);
         digitalWrite(_pinWake_hw_15, LOW);
-        return (!bInNormalMode) || bSuccess;
+//        return (!bInNormalMode) || bSuccess;
+        return true;
     case OM_DORMANT:
         digitalWrite(_pinWake_sw_7, HIGH);
         bInNormalMode=isModuleActive(2000);
@@ -877,15 +887,12 @@ bool rn4020::waitForReply(unsigned long uiTimeout, const char *pattern)
     return false;
 }
 
-bool rn4020::waitForStartup(unsigned long baudrate)
+bool rn4020::waitForStartup()
 {
-    delay(100);//give serial port time to send its last characters
-    sPort->flush();//on Nucleo, flush() simply clears buffers, it doesn't wait for TX-ing to finish.
-    sPort->end();
-    sPort->begin(baudrate);
     //After power up, it takes about 1.28s for the RN4020 to become active
     if(!isModuleActive(1500))
     {
+        debug_println("Module is not active");
         return false;
     }
     //25µs after pin12 came high, "CMD\r\n" will be sent out on the UART

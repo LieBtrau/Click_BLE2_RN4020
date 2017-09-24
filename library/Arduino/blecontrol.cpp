@@ -78,11 +78,8 @@ bool bleControl::programPeripheral()
     {
         return false;
     }
-    if(!rn->setTxPower(0))
-    {
-        return false;
-    }
-    return true;
+    //weakest transmission power in order to limit communication range
+    return rn->setTxPower(0);
 }
 
 bool bleControl::programCentral()
@@ -154,8 +151,8 @@ bool bleControl::addLocalCharacteristics(btCharacteristic *localCharacteristics[
     {
         return false;
     }
-    //Power must be cycled after removing private characteristics
-    if(!rn->begin(baudrate))
+    //Module must be reset after removing characteristics
+    if(!rn->doReboot(baudrate))
     {
         return false;
     }

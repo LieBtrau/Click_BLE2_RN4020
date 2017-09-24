@@ -79,7 +79,7 @@ public:
 private:
     word getNrOfOccurrence(char* buf, char findc);
     void cyclePower(OPERATING_MODES om);
-    bool doFactoryDefault();
+    bool doFactoryDefault(unsigned long baudrate);
     bool gotLine();
     void hex2array(char* hexstringIn, byte *arrayOut, byte& lengthOut);
     void array2hex(const byte* arrayIn, char* stringOut, byte length);
@@ -90,7 +90,8 @@ private:
     bool setBaudrate(unsigned long baud);
     word waitForNrOfLines(unsigned long ulTimeout, byte nrOfEols);
     bool waitForReply(unsigned long uiTimeout, const char *pattern);
-    bool waitForStartup(unsigned long baudrate);
+    bool waitForStartup();
+    void setLocalBaud(unsigned long baudrate);
     byte _pinWake_sw_7; //RN4020 pin 7
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
