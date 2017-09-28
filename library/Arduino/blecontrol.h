@@ -48,7 +48,7 @@ public:
     bool getBluetoothDeviceName(char* btName);
     bool setBluetoothDeviceName(const char* btName);
     bool addLocalCharacteristics(btCharacteristic *localCharacteristics[], byte nrOfChrs);
-    bool writeLocalCharacteristic(btCharacteristic* bt, byte value);
+    bool writeLocalCharacteristic(btCharacteristic* bt, byte* value, byte length);
     bool writeRemoteCharacteristic(btCharacteristic* bt, byte* value, byte length);
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
     bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);

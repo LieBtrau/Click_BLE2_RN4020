@@ -234,6 +234,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
         switch(state)
         {
         case ST_NOTCONNECTED:
+            status.isConnected=false;
             if(!rn->startConnecting(remoteBtAddress))
             {
                 return false;
@@ -258,6 +259,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
             bPassReady=false;
             if(!rn->startBonding())
             {
+                debug_println("Bonding failed.");
                 rn->doDisconnect();
                 return false;
             }
@@ -265,8 +267,9 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
             state=ST_START_BONDING;
             break;
         case ST_START_BONDING:
-            if(millis()>ulStartTime+1000)
+            if(millis()>ulStartTime+2000)
             {
+                debug_println("Too late");
                 disconnect();
                 return false;
             }
@@ -335,14 +338,14 @@ void bleControl::setPasscode(unsigned long pass)
     rn->setBondingPasscode(pass);
 }
 
-bool bleControl::writeLocalCharacteristic(btCharacteristic *bt, byte value)
+bool bleControl::writeLocalCharacteristic(btCharacteristic *bt, byte *value, byte length)
 {
     word handle=getLocalHandle(bt);
     if(!handle)
     {
         return false;
     }
-    return rn->doWriteLocalCharacteristic(handle,&value,1);
+    return rn->doWriteLocalCharacteristic(handle, value, length);
 }
 
 bool bleControl::writeRemoteCharacteristic(btCharacteristic *bt, byte *value, byte length)
