@@ -24,8 +24,8 @@ public:
     typedef enum
     {
         OM_NORMAL,
-        OM_DEEP_SLEEP,
-        OM_DORMANT
+        OM_DEEP_SLEEP,  //BLE modem still works, UART works in 2400baud
+        OM_DORMANT      //Pairing status remembered, all other functionality off
     }OPERATING_MODES;
     typedef struct
     {
