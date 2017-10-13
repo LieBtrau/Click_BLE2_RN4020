@@ -165,6 +165,12 @@ int8_t ble2_set_sw_revision_value (char* sw_value)
     return status;
 }
 
+int8_t ble2_get_serial_number_value ()
+{
+    ble2_hal_send("GDS");
+    return 0;
+}
+
 int8_t ble2_set_serial_number_value (char* serial_value)
 {
     char tmp[23] = {0};

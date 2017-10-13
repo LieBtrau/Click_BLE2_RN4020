@@ -30,11 +30,12 @@ void UART_Write_Text(const char *_data)
     }
 }
 
-rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr):
+rn4020::rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr, byte pinBtConnected):
     _pinWake_sw_7(pinWake_sw),
     _pinWake_hw_15(pinWake_hw),
     _pinEnPwr(pinEnPwr),
     _pinActive_12(pinBtActive),
+    _pinBtConnected(pinBtConnected),
     _ftConnectionStateChanged(0),
     _ftAdvertisementReceived(0),
     _ftBondingEvent(0),
@@ -65,6 +66,7 @@ bool rn4020::begin(unsigned long baudrate)
     pinMode(_pinWake_hw_15, OUTPUT);
     pinMode(_pinWake_sw_7, OUTPUT);
     pinMode(_pinActive_12, INPUT);
+    pinMode(_pinBtConnected, INPUT);
     if(!rxbuf)
     {
         return false;
@@ -176,7 +178,7 @@ bool rn4020::doFactoryDefault(unsigned long baudrate)
         return true;
     }
     return false;
- }
+}
 
 /* Scan for undirected advertisements.
  * Bonded (but unconnected) devices will send directed advertisements (unless configured otherwise with "SR")
@@ -389,6 +391,11 @@ bool rn4020::isConnectedTo(byte* macOut)
     return false;
 }
 
+bool rn4020::isConnected()
+{
+    return (digitalRead(_pinBtConnected) ? true : false);
+}
+
 
 bool rn4020::getBluetoothDeviceName(char* btName)
 {
@@ -415,32 +422,26 @@ bool rn4020::getBluetoothDeviceName(char* btName)
     return false;
 }
 
-bool rn4020::getMacAddress(byte* array, byte& length)
+bool rn4020::getMacAddress(byte* macOut, byte& length)
 {
-    if(!array)
+    char hexmac[20];
+    if(!macOut)
     {
         return false;
     }
-    char hexarray[12];
-    ble2_display_critical_info();
-    if(!waitForNrOfLines(2000, 8))
+    ble2_get_serial_number_value();
+    if(!waitForNrOfLines(2000,1))
     {
         return false;
     }
-    //Parse response line by line
-    char* pch = strtok (rxbuf,"\r\n");
-    while (pch != NULL)
+    if(sscanf(rxbuf,"%12s", hexmac))
     {
-        if(sscanf(pch, "BTA=%12s", hexarray)==1)
-        {
-            //MAC address contains 6 bytes
-            length=6;
-            hex2array(hexarray, array, length);
-            resetBuffer();
-            return true;
-        }
-        pch = strtok (NULL, "\r\n");
+        //MAC address contains 6 bytes
+        length=6;
+        hex2array(hexmac, macOut, length);
     }
+    resetBuffer();
+    return (length==6 ? true:false);
 }
 
 word rn4020::getLocalHandle(btCharacteristic* bt)
@@ -809,16 +810,16 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         digitalWrite(_pinWake_hw_15, LOW);
         return bSuccess;
     case OM_DEEP_SLEEP:
-//        bInNormalMode=isModuleActive(2000);
+        //        bInNormalMode=isModuleActive(2000);
         digitalWrite(_pinWake_sw_7, LOW);
-//        if(bInNormalMode)
-//        {
-//            bSuccess=waitForReply(1000,"END");
-//        }
+        //        if(bInNormalMode)
+        //        {
+        //            bSuccess=waitForReply(1000,"END");
+        //        }
         digitalWrite(_pinWake_hw_15, HIGH);
         delay(10);
         digitalWrite(_pinWake_hw_15, LOW);
-//        return (!bInNormalMode) || bSuccess;
+        //        return (!bInNormalMode) || bSuccess;
         return true;
     case OM_DORMANT:
         digitalWrite(_pinWake_sw_7, HIGH);

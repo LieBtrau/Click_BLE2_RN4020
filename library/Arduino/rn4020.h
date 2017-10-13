@@ -39,7 +39,7 @@ public:
         BD_BONDED,
         BD_SECURED
     }BONDING_MODES;
-    rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr);
+    rn4020(HardwareSerial &s, byte pinWake_sw, byte pinBtActive, byte pinWake_hw, byte pinEnPwr, byte pinBtConnected);
     bool begin(unsigned long baudrate);
     bool doAddCharacteristic(btCharacteristic* bt);
     bool doAddService(btCharacteristic* bt);
@@ -62,6 +62,7 @@ public:
     word getRemoteHandle(btCharacteristic *bt);
     bool isBonded(bool &status, byte *macOut);
     bool isBonded(bool &status);
+    bool isConnected();
     bool isConnectedTo(byte* macOut);
     void loop();
     void setAdvertisementListener(void(*ftAdvertisementReceived)(ADVERTISEMENT*));
@@ -96,6 +97,7 @@ private:
     byte _pinActive_12; //RN4020 pin 12
     byte _pinWake_hw_15;//RN4020 pin 15
     byte _pinEnPwr;
+    byte _pinBtConnected;
     void (*_ftConnectionStateChanged)(bool bUp);
     void (*_ftBondingEvent)(BONDING_MODES bd);
     void (*_ftAdvertisementReceived)(ADVERTISEMENT* adv);

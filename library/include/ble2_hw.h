@@ -212,6 +212,13 @@ int8_t ble2_set_manufacturer_name_value (char* name_value);
 int8_t ble2_set_sw_revision_value (char* sw_value);
 /**
  * @brief
+ * Gets the value of the serial number characteristics in the Device Information Service.
+ * @return
+ * 0 if sucessful, -1 if failed
+ */
+int8_t ble2_get_serial_number_value ();
+/**
+ * @brief
  * Sets the value of the serial number characteristics in the Device Information Service.
  * @param serial_value
  * Desired serial number value
