@@ -39,6 +39,7 @@ public:
     bool getLocalMacAddress(byte* address, byte& length);
     bool isBonded();
     bool isBondedTo(byte* mac);
+    bool isConnected();
     bool isSecured();
     bool unbond();
     void setEventListener(void(*ftEventReceived)(EVENT));

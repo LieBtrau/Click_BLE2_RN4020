@@ -60,6 +60,12 @@ bool bleControl::isBonded()
     return status.isBonded;
 }
 
+bool bleControl::isConnected()
+{
+    status.isConnected=rn->isConnected();
+    return status.isConnected;
+}
+
 bool bleControl::isSecured()
 {
     return status.isSecured;
