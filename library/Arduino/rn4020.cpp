@@ -2,7 +2,7 @@
 #include "ble2_hw.h"
 #include "debug.h"
 
-//#define DEBUG_RX
+#define DEBUG_RX
 
 namespace
 {
@@ -77,7 +77,11 @@ bool rn4020::begin(unsigned long baudrate)
         return false;
     }
     //"CMD" will be printed, catch it.
-    return waitForStartup();
+    if(waitForStartup())
+    {
+        return true;
+    }
+    return doFactoryDefault(baudrate);
 }
 
 word rn4020::getNrOfOccurrence(char* buf, char findc)

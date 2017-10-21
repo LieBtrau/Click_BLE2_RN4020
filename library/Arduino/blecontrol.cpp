@@ -31,6 +31,7 @@ bleControl::bleControl(rn4020* prn)
 {
     generateEvent=0;
     rn=prn;
+    initialized=false;
 }
 
 //Set up the RN4020 module
@@ -40,12 +41,18 @@ bleControl::bleControl(rn4020* prn)
 bool bleControl::init(unsigned long baud)
 {
     baudrate=baud;
-    if(!rn->begin(baudrate) || !rn->isBonded(status.isBonded))
+    if(!rn->begin(baudrate))
+    {
+        return false;
+    }
+    //For some unknown reason, the command only succeeds the 2nd time.
+    if(!rn->isBonded(status.isBonded) && !rn->isBonded(status.isBonded))
     {
         return false;
     }
     rn->setConnectionListener(connectionEvent);
     rn->setBondingListener(bondingEvent);
+    initialized=true;
     return true;
 }
 
@@ -64,6 +71,11 @@ bool bleControl::isConnected()
 {
     status.isConnected=rn->isConnected();
     return status.isConnected;
+}
+
+bool bleControl::isInitialized()
+{
+    return initialized;
 }
 
 bool bleControl::isSecured()
@@ -174,9 +186,15 @@ bool bleControl::addLocalCharacteristics(btCharacteristic *localCharacteristics[
 }
 
 
-void bleControl::disconnect()
+bool bleControl::disconnect(unsigned long timeout)
 {
     rn->doDisconnect();
+    unsigned long startTime=millis();
+    while(status.isConnected && millis() < startTime + timeout)
+    {
+        loop();
+    }
+    return !isConnected();
 }
 
 bool bleControl::loop()
@@ -266,7 +284,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
             if(!rn->startBonding())
             {
                 debug_println("Bonding failed.");
-                rn->doDisconnect();
+		rn->doDisconnect();
                 return false;
             }
             ulStartTime=millis();
@@ -276,7 +294,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
             if(millis()>ulStartTime+2000)
             {
                 debug_println("Too late");
-                disconnect();
+		disconnect(3000);
                 return false;
             }
             if(status.isBonded && status.isSecured) //re-establishing bond
@@ -291,7 +309,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
                     //Repairing needed.
                     debug_println("Repairing needed.");
                     //The disconnect will only be executed after the 30s timeout of the password input.
-                    disconnect();
+		    disconnect(3000);
                     return false;
                 }
                 generateEvent(EV_PASSCODE_GENERATED);
@@ -302,7 +320,7 @@ bool bleControl::secureConnect(const byte* remoteBtAddress)
         case ST_PASSCODE_GENERATED:
             if(millis()>ulStartTime+1000)
             {
-                disconnect();
+		disconnect(3000);
                 return false;
             }
             if(status.isBonded)

@@ -40,6 +40,7 @@ public:
     bool isBonded();
     bool isBondedTo(byte* mac);
     bool isConnected();
+    bool isInitialized();
     bool isSecured();
     bool unbond();
     void setEventListener(void(*ftEventReceived)(EVENT));
@@ -54,7 +55,7 @@ public:
     bool readRemoteCharacteristic(btCharacteristic* bt, byte* value, byte& length);
     bool readLocalCharacteristic(btCharacteristic *bt, byte* value, byte& length);
     bool secureConnect(const byte *peripheralMac);
-    void disconnect();
+    bool disconnect(unsigned long timeout);
     bool sleep();
     bool reboot();
     word getLocalHandle(btCharacteristic *bt);
@@ -71,6 +72,7 @@ private:
     }CONNECT_STATE;
     word getRemoteHandle(btCharacteristic *bt);
     unsigned long baudrate;
+    bool initialized;
 };
 
 #endif // BLECONTROL_H
