@@ -31,7 +31,7 @@ public:
     bleControl(rn4020 *prn);
     bool init(unsigned long baud);
     bool beginCentral();
-    bool startAdvertizement(unsigned int interval_ms);
+    bool setAdvertizement(unsigned int interval_ms);
     bool programPeripheral();
     bool programCentral();
     bool beginPeripheral(btCharacteristic *localCharacteristics[], byte nrOfChrs);

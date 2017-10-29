@@ -43,7 +43,7 @@ public:
     bool begin(unsigned long baudrate);
     bool doAddCharacteristic(btCharacteristic* bt);
     bool doAddService(btCharacteristic* bt);
-    bool doAdvertizing(bool bStartNotStop, unsigned int interval_ms);
+    bool setAdvertizement(unsigned int interval_ms);
     bool startConnecting(const byte *remoteBtAddress);
     bool doDisconnect();
     bool doFindRemoteDevices(byte **&macList, byte &nrOfItems, unsigned long timeout);

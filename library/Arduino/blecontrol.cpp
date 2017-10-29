@@ -151,12 +151,16 @@ bool bleControl::unbond()
     return false;
 }
 
-bool bleControl::startAdvertizement(unsigned int interval_ms)
+//set interval to 0 to disable advertizements
+bool bleControl::setAdvertizement(unsigned int interval_ms)
 {
     //stop advertizing
-    rn->doAdvertizing(false,0);
+    if(!rn->setAdvertizement(0))
+    {
+        return false;
+    }
     //start new advertizement command
-    return rn->doAdvertizing(true, interval_ms);
+    return (interval_ms ? rn->setAdvertizement(interval_ms) : true);
 }
 
 

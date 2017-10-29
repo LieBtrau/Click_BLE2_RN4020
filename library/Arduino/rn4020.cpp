@@ -112,9 +112,9 @@ void rn4020::cyclePower(OPERATING_MODES om)
     }
 }
 
-bool rn4020::doAdvertizing(bool bStartNotStop, unsigned int interval_ms)
+bool rn4020::setAdvertizement(unsigned int interval_ms)
 {
-    if(bStartNotStop)
+    if(interval_ms)
     {
         //Start
         ble2_start_advertisement(interval_ms,0);
@@ -244,13 +244,17 @@ bool rn4020::doFindRemoteDevices(byte** &macList, byte& nrOfItems, unsigned long
 
 bool rn4020::doReadLocalCharacteristic(word handle, byte* array, byte& length)
 {
+    char hexarray[41];//maximum data length=20 bytes
     ble2_read_server_characteristic_content(handle);
     if(!waitForNrOfLines(2000,1))
     {
         return false;
     }
-
-    hex2array(rxbuf, array, length);
+    if(sscanf(rxbuf, "%[0-9]s", hexarray)!=1)
+    {
+        return false;
+    }
+    hex2array(hexarray, array, length);
     resetBuffer();
     return true;
 }
@@ -820,9 +824,9 @@ bool rn4020::setOperatingMode(OPERATING_MODES om)
         //        {
         //            bSuccess=waitForReply(1000,"END");
         //        }
-        digitalWrite(_pinWake_hw_15, HIGH);
-        delay(10);
-        digitalWrite(_pinWake_hw_15, LOW);
+//        digitalWrite(_pinWake_hw_15, HIGH);
+//        delay(10);
+//        digitalWrite(_pinWake_hw_15, LOW);
         //        return (!bInNormalMode) || bSuccess;
         return true;
     case OM_DORMANT:
